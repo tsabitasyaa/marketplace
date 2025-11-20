@@ -52,7 +52,7 @@ export default function Page() {
 
         <p className="text-center text-navy mt-4">
           Belum punya akun?{" "}
-          <Link href="/penjual/register" className="text-teal font-semibold hover:underline">
+          <Link href="/penjual/registrasi" className="text-teal font-semibold hover:underline">
             Register dulu
           </Link>
         </p>
