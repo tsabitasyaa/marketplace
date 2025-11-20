@@ -21,7 +21,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white text-navy flex flex-col">
-      
       {/* NAVBAR */}
       <header className="w-full bg-teal text-white py-4 px-6 flex items-center justify-between shadow relative z-50">
         <div className="text-xl font-bold">nama & logo aplikasi</div>
@@ -36,9 +35,9 @@ export default function Home() {
           <span className="text-navy">🔍</span>
         </div>
 
-        {/* BUTTON LOGIN - SUDAH TERHUBUNG KE /penjual/login */}
+        {/* BUTTON LOGIN - MENGARAH KE /login */}
         <Link 
-          href="/penjual/login"
+          href="/login" 
           className="bg-beige text-navy px-4 py-2 rounded-full shadow hover:bg-navy hover:text-white transition duration-300 font-medium"
         >
           Login as Seller
@@ -46,7 +45,6 @@ export default function Home() {
       </header>
 
       <div className="flex flex-1">
-        
         {/* SIDEBAR */}
         <aside className="w-56 bg-beige text-navy min-h-screen p-4 space-y-4">
           <p className="font-bold text-lg">FILTER</p>
