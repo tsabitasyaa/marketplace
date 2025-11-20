@@ -10,10 +10,10 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen flex flex-col">
 
-      {/* HEADER (warna beige seperti main page) */}
+      {/* HEADER (warna navy) */}
       <header
         className="w-full py-4 px-6 shadow flex items-center justify-between"
-        style={{ background: "var(--color-beige)", color: "var(--color-navy)" }}
+        style={{ background: "var(--color-teal)", color: "var(--color-white)" }}
       >
         <div className="flex items-center gap-3">
           <img
@@ -27,8 +27,8 @@ export default function AdminPage() {
         <button
           className="px-4 py-2 rounded-md"
           style={{
-            background: "var(--color-navy)",
-            color: "var(--color-white)",
+            background: "var(--color-white)",
+            color: "var(--color-navy)",
           }}
         >
           Settings
@@ -38,7 +38,7 @@ export default function AdminPage() {
       {/* BODY */}
       <div className="flex flex-1">
 
-        {/* SIDEBAR */}
+        {/* SIDEBAR (warna beige) */}
         <aside
           className="w-60 p-6 space-y-4 shadow-md"
           style={{ background: "var(--color-beige)", color: "var(--color-navy)" }}
@@ -104,7 +104,7 @@ function SidebarItem({
 }
 
 /* --------------------------------------------------------------
-   CONTENT SECTION — REUSE dari codingan kamu
+   CONTENT SECTION
 -------------------------------------------------------------- */
 
 // ---------------- Verifikasi ----------------
