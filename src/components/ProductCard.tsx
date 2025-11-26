@@ -11,6 +11,7 @@ type ProductCardProps = {
   storeName: string;
   location: string; // kota + provinsi
   image: string;
+  reviewCount: number;
 };
 
 export default function ProductCard({
@@ -22,6 +23,7 @@ export default function ProductCard({
   storeName,
   location,
   image,
+  reviewCount,
 }: ProductCardProps) {
   return (
     <Link href={`/produk/${id}`}>
@@ -55,7 +57,7 @@ export default function ProductCard({
             {/* RATING */}
             <div className="flex items-center gap-1 text-amber-500 text-sm font-medium">
             <Star size={16} className="fill-amber-400 text-amber-400" />
-            {rating}
+            {rating} <span className="text-gray-500">({reviewCount})</span>
             </div>
 
             <hr className="my-1" />
