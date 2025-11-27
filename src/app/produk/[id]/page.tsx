@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Star, Store, MapPin } from "lucide-react";
+import { Star, Store, MapPin, X } from "lucide-react";
 
 export default function ProductDetail({ params }: { params: { id: string } }) {
   const productId = params.id;
 
-  // Dummy product dulu
+  // Dummy product
   const product = {
     id: productId,
     name: "Sepatu Running Premium",
@@ -48,7 +48,10 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
   const [comment, setComment] = useState("");
   const [rating, setRating] = useState(0);
 
-  // Cek apakah user sudah pernah memberi komentar untuk produk ini
+  // State Popup
+  const [showModal, setShowModal] = useState(false);
+
+  // Cek apakah user sudah pernah komentar
   const [hasCommented, setHasCommented] = useState(false);
 
   useEffect(() => {
@@ -65,25 +68,24 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
     }
 
     // Tambahkan komentar baru
-    setComments((prev) => [
-      ...prev,
-      { name, rating, comment, province },
-    ]);
+    setComments((prev) => [...prev, { name, rating, comment, province }]);
 
     // Cegah komentar ulang
     localStorage.setItem(`commented_${productId}`, "true");
     setHasCommented(true);
 
-    // Kirim email (simulasi, bisa sambung ke API)
-    alert(`Terima kasih! Email ucapan terima kasih dikirim ke ${email}`);
+    alert(`Terima kasih! Email ucapan terkirim ke ${email}`);
 
-    // Reset form
+    // Reset input
     setName("");
     setPhone("");
     setEmail("");
     setProvince("");
     setComment("");
     setRating(0);
+
+    // Tutup popup
+    setShowModal(false);
   };
 
   return (
@@ -134,7 +136,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* KOMENTAR DAN RATING */}
+      {/* KOMENTAR */}
       <div className="max-w-5xl w-full mt-16">
         <h2 className="text-2xl font-semibold mb-4">Komentar & Rating</h2>
 
@@ -158,74 +160,96 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* FORM KOMENTAR */}
-      <div className="max-w-3xl w-full mt-12 p-6 bg-white border border-gray-300 rounded-xl shadow-md">
-        <h2 className="text-xl font-bold mb-4">Berikan Komentar & Rating</h2>
+      {/* BUTTON BERIKAN RATING */}
+      {!hasCommented && (
+        <button
+          onClick={() => setShowModal(true)}
+          className="mt-8 bg-teal text-white px-6 py-3 rounded-lg font-semibold hover:bg-navy transition"
+        >
+          Beri Rating
+        </button>
+      )}
 
-        {hasCommented ? (
-          <p className="text-green-600">Anda sudah memberi komentar untuk produk ini.</p>
-        ) : (
-          <form className="grid grid-cols-1 gap-4" onSubmit={handleSubmit}>
-            <input
-              className="px-4 py-2 rounded border"
-              placeholder="Nama Anda"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-
-            <input
-              className="px-4 py-2 rounded border"
-              placeholder="Nomor HP"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-            />
-
-            <input
-              type="email"
-              className="px-4 py-2 rounded border"
-              placeholder="Email Anda"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-
-            <input
-              className="px-4 py-2 rounded border"
-              placeholder="Provinsi"
-              value={province}
-              onChange={(e) => setProvince(e.target.value)}
-              required
-            />
-
-            <textarea
-              className="px-4 py-2 rounded border"
-              placeholder="Komentar Anda"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              required
-            />
-
-            <div className="flex gap-2">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <Star
-                  key={n}
-                  size={30}
-                  className={`cursor-pointer ${
-                    rating >= n ? "fill-amber-400 text-amber-400" : "text-gray-400"
-                  }`}
-                  onClick={() => setRating(n)}
-                />
-              ))}
-            </div>
-
-            <button className="mt-4 bg-teal text-white px-4 py-2 rounded-lg hover:bg-navy transition">
-              Kirim Komentar
+      {/* POPUP FORM */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl w-full max-w-lg shadow-xl relative">
+            
+            {/* CLOSE BUTTON */}
+            <button
+              className="absolute top-3 right-3 text-gray-500 hover:text-red-500"
+              onClick={() => setShowModal(false)}
+            >
+              <X size={22} />
             </button>
-          </form>
-        )}
-      </div>
+
+            <h2 className="text-xl font-bold mb-4">Beri Komentar & Rating</h2>
+
+            <form className="grid grid-cols-1 gap-4" onSubmit={handleSubmit}>
+              <input
+                className="px-4 py-2 rounded border"
+                placeholder="Nama Anda"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+
+              <input
+                className="px-4 py-2 rounded border"
+                placeholder="Nomor HP"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+              />
+
+              <input
+                type="email"
+                className="px-4 py-2 rounded border"
+                placeholder="Email Anda"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+
+              <input
+                className="px-4 py-2 rounded border"
+                placeholder="Provinsi"
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                required
+              />
+
+              <textarea
+                className="px-4 py-2 rounded border"
+                placeholder="Komentar Anda"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                required
+              />
+
+              {/* PILIH RATING */}
+              <div className="flex gap-2 justify-center mb-2">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Star
+                    key={n}
+                    size={32}
+                    className={`cursor-pointer ${
+                      rating >= n
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-gray-400"
+                    }`}
+                    onClick={() => setRating(n)}
+                  />
+                ))}
+              </div>
+
+              <button className="mt-4 bg-teal text-white px-4 py-2 rounded-lg hover:bg-navy transition">
+                Kirim Komentar
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
