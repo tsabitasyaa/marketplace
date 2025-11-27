@@ -250,6 +250,7 @@ export default function RegistrasiPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // ✅ UPDATE: Fungsi handleSubmit yang terhubung dengan API
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -267,10 +268,34 @@ export default function RegistrasiPage() {
     setIsLoading(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const formData = new FormData();
       
-      setSuccessMessage("Registrasi berhasil! Data toko Anda sedang diverifikasi.");
+      // Append all form data to FormData
+      Object.entries(form).forEach(([key, value]) => {
+        if (value !== null) {
+          if (value instanceof File) {
+            formData.append(key, value);
+          } else {
+            formData.append(key, value.toString());
+          }
+        }
+      });
+
+      // Kirim data ke API
+      const response = await fetch('/api/penjual/registrasi', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Terjadi kesalahan saat registrasi');
+      }
+
+      setSuccessMessage(result.message);
       
+      // Reset form setelah sukses
       setForm({
         namaToko: "",
         deskripsi: "",
@@ -288,8 +313,9 @@ export default function RegistrasiPage() {
         fileKTP: null,
       });
       setTouched({});
-    } catch {
-      setSuccessMessage("Terjadi kesalahan saat registrasi. Silakan coba lagi.");
+      
+    } catch (error) {
+      setSuccessMessage(error instanceof Error ? error.message : "Terjadi kesalahan saat registrasi. Silakan coba lagi.");
     } finally {
       setIsLoading(false);
     }
