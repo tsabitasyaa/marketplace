@@ -18,6 +18,7 @@ interface RegistrasiRequest {
   provinsi: string;
   ktpPIC: string;
 }
+
 // Helper function to generate unique ID
 function generateUniqueId(): string {
   return crypto.randomUUID();
