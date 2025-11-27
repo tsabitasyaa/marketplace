@@ -1,166 +1,256 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 export default function VerifikasiPage() {
+  const [sellers, setSellers] = useState<any[]>([]);
   const [selectedSeller, setSelectedSeller] = useState<any>(null);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  // === 3 TOKO ===
-  const sellers = [
-    {
-      id: 1,
-      namaToko: "RinaCraft",
-      deskripsi: "Kerajinan eco-friendly",
-      picName: "Rina Kusuma",
-      hp: "081234567890",
-      email: "rina@example.com",
-      alamat: "Jl. Melati No. 10",
-      rt_rw: "05/03",
-      kelurahan: "Tembalang",
-      kota: "Semarang",
-      provinsi: "Jawa Tengah",
-      ktp: "1234567890123456",
-      fotoPIC: "/pic-rina.jpg",
-      fotoKTP: "/ktp-rina.jpg",
-    },
-    {
-      id: 2,
-      namaToko: "BatikLestari",
-      deskripsi: "Produk batik handmade",
-      picName: "Siti Marlina",
-      hp: "082233445566",
-      email: "marlina@example.com",
-      alamat: "Jl. Kenanga No. 22",
-      rt_rw: "03/02",
-      kelurahan: "Pedurungan",
-      kota: "Semarang",
-      provinsi: "Jawa Tengah",
-      ktp: "9876543210123456",
-      fotoPIC: "/pic-siti.jpg",
-      fotoKTP: "/ktp-siti.jpg",
-    },
-    {
-      id: 3,
-      namaToko: "KopiNusantara",
-      deskripsi: "Kopi asli Nusantara",
-      picName: "Agus Pratama",
-      hp: "081998877665",
-      email: "agus@example.com",
-      alamat: "Jl. Anggrek No. 8",
-      rt_rw: "07/04",
-      kelurahan: "Gajahmungkur",
-      kota: "Semarang",
-      provinsi: "Jawa Tengah",
-      ktp: "1122334455667788",
-      fotoPIC: "/pic-agus.jpg",
-      fotoKTP: "/ktp-agus.jpg",
-    },
-  ];
+  // ======================
+  // FETCH DATA PENJUAL
+  // ======================
+  async function fetchSellers() {
+    try {
+      setLoading(true);
+      setErrorMsg("");
+
+      const res = await fetch("/api/penjual/pending");
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
+      const json = await res.json();
+      console.log("API /penjual/pending =>", json);
+
+      if (!json.success) {
+        setErrorMsg(json.message || "Gagal memuat data");
+        setSellers([]);
+      } else {
+        setSellers(json.data || []);
+      }
+
+    } catch (err: any) {
+      console.error("Fetch error:", err);
+      setErrorMsg(err.message || "Terjadi kesalahan koneksi ke server");
+      setSellers([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchSellers();
+  }, []);
+
+  // ======================
+  // HANDLER VERIFIKASI
+  // ======================
+  async function handleVerify(status: "accepted" | "rejected") {
+    if (!selectedSeller) return;
+
+    try {
+      const res = await fetch("/api/sellers/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          seller_id: selectedSeller.id,
+          status,
+        }),
+      });
+
+      const json = await res.json();
+      console.log("API /verify =>", json);
+
+      if (!json.success) {
+        alert(json.message || "Gagal memproses verifikasi");
+        return;
+      }
+
+      alert(`Penjual berhasil di${status === 'accepted' ? 'verifikasi' : 'tolak'}`);
+      await fetchSellers();
+      setSelectedSeller(null);
+
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi error saat memproses verifikasi");
+    }
+  }
 
   return (
-    <>
-      <h2 className="text-[var(--navy)] font-bold text-xl mb-4">
+    <div className="p-6">
+      <h2 className="text-[var(--navy)] font-bold text-2xl mb-6">
         Verifikasi Penjual
       </h2>
 
+      {/* ERROR MESSAGE */}
+      {errorMsg && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {errorMsg}
+        </div>
+      )}
+
+      {/* LOADING */}
+      {loading && (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--teal)]"></div>
+          <span className="ml-2">Memuat data...</span>
+        </div>
+      )}
+
       {/* LIST SELLER */}
-      <div className="flex flex-col gap-6">
+      <div className="grid gap-4">
+        {!loading && sellers.length === 0 && !errorMsg && (
+          <div className="text-center py-8 text-gray-500">
+            <p className="text-lg">Tidak ada penjual menunggu verifikasi.</p>
+          </div>
+        )}
+
         {sellers.map((seller) => (
           <div
             key={seller.id}
-            className="bg-[var(--sky)] p-6 rounded-xl shadow flex justify-between items-center"
+            className="bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow"
           >
-            <div>
-              <h3 className="font-bold text-lg">{seller.namaToko}</h3>
-              <p className="text-sm">{seller.picName}</p>
-            </div>
+            <div className="flex justify-between items-center">
+              <div className="flex-1">
+                <h3 className="font-bold text-xl text-[var(--navy)] mb-2">
+                  {seller.store_name}
+                </h3>
+                <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                  <p><strong>PIC:</strong> {seller.pic_name}</p>
+                  <p><strong>Telepon:</strong> {seller.pic_phone}</p>
+                  <p><strong>Email:</strong> {seller.pic_email}</p>
+                  <p><strong>Lokasi:</strong> {seller.city}, {seller.province}</p>
+                </div>
+                {seller.description && (
+                  <p className="mt-2 text-gray-700"><strong>Deskripsi:</strong> {seller.description}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  Didaftarkan pada: {new Date(seller.created_at).toLocaleDateString('id-ID')}
+                </p>
+              </div>
 
-            <button
-              onClick={() => setSelectedSeller(seller)}
-              className="bg-[var(--teal)] hover:bg-[var(--navy)] text-white px-4 py-2 rounded-full"
-            >
-              View Document
-            </button>
+              <button
+                onClick={() => setSelectedSeller(seller)}
+                className="bg-[var(--teal)] hover:bg-[var(--navy)] text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Lihat Dokumen
+              </button>
+            </div>
           </div>
         ))}
       </div>
 
       {/* MODAL DETAIL */}
       {selectedSeller && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-50">
-          <div className="bg-white rounded-xl w-full max-w-3xl p-8 shadow-lg overflow-y-auto max-h-[90vh]">
-            <h2 className="text-2xl font-bold mb-4 text-[var(--navy)]">
-              Detail Dokumen Penjual
-            </h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-[var(--navy)]">
+                  Detail Dokumen Penjual
+                </h2>
+                <button
+                  onClick={() => setSelectedSeller(null)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
 
-            <div className="space-y-2 text-[var(--navy)]">
-              <p><strong>Nama Toko:</strong> {selectedSeller.namaToko}</p>
-              <p><strong>Deskripsi:</strong> {selectedSeller.deskripsi}</p>
-              <p><strong>Nama PIC:</strong> {selectedSeller.picName}</p>
-              <p><strong>No HP:</strong> {selectedSeller.hp}</p>
-              <p><strong>Email:</strong> {selectedSeller.email}</p>
-
-              <p><strong>Alamat:</strong> {selectedSeller.alamat}</p>
-              <p><strong>RT/RW:</strong> {selectedSeller.rt_rw}</p>
-              <p><strong>Kelurahan:</strong> {selectedSeller.kelurahan}</p>
-              <p><strong>Kota:</strong> {selectedSeller.kota}</p>
-              <p><strong>Provinsi:</strong> {selectedSeller.provinsi}</p>
-
-              <p><strong>No KTP:</strong> {selectedSeller.ktp}</p>
-
-              {/* FOTO-FOTO */}
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div>
-                  <p className="font-semibold">Foto PIC</p>
-                  <img
-                    onClick={() => setZoomImage(selectedSeller.fotoPIC)}
-                    src={selectedSeller.fotoPIC}
-                    className="w-40 h-40 object-cover border rounded cursor-pointer hover:scale-105 transition"
-                  />
+              {/* INFO PENJUAL */}
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg border-b pb-2">Informasi Toko</h3>
+                  <p><strong>Nama Toko:</strong> {selectedSeller.store_name}</p>
+                  <p><strong>Deskripsi:</strong> {selectedSeller.description || "-"}</p>
                 </div>
-
-                <div>
-                  <p className="font-semibold">Foto KTP</p>
-                  <img
-                    onClick={() => setZoomImage(selectedSeller.fotoKTP)}
-                    src={selectedSeller.fotoKTP}
-                    className="w-40 h-40 object-cover border rounded cursor-pointer hover:scale-105 transition"
-                  />
+                
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg border-b pb-2">Informasi PIC</h3>
+                  <p><strong>Nama PIC:</strong> {selectedSeller.pic_name}</p>
+                  <p><strong>No HP:</strong> {selectedSeller.pic_phone}</p>
+                  <p><strong>Email:</strong> {selectedSeller.pic_email}</p>
+                  <p><strong>Alamat:</strong> {selectedSeller.pic_address || "-"}</p>
+                  <p><strong>KTP:</strong> {selectedSeller.pic_ktp || "-"}</p>
                 </div>
               </div>
-            </div>
 
-            <div className="flex justify-end gap-4 mt-6">
-              <button className="bg-red-500 text-white px-6 py-2 rounded-lg">
-                Tolak
-              </button>
-              <button className="bg-green-600 text-white px-6 py-2 rounded-lg">
-                Verifikasi
-              </button>
-              <button
-                onClick={() => setSelectedSeller(null)}
-                className="border border-[var(--navy)] px-6 py-2 rounded-lg"
-              >
-                Tutup
-              </button>
+              {/* DOKUMEN */}
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="text-center">
+                  <h3 className="font-semibold mb-3">Foto PIC</h3>
+                  <img
+                    onClick={() => setZoomImage(selectedSeller.pic_photo_url)}
+                    src={selectedSeller.pic_photo_url}
+                    className="w-48 h-48 object-cover border-2 border-gray-300 rounded-lg cursor-pointer hover:border-[var(--teal)] transition-colors mx-auto"
+                    alt="Foto PIC"
+                  />
+                  <p className="text-sm text-gray-500 mt-2">Klik untuk zoom</p>
+                </div>
+
+                <div className="text-center">
+                  <h3 className="font-semibold mb-3">Foto KTP</h3>
+                  <img
+                    onClick={() => setZoomImage(selectedSeller.pic_ktp_file_url)}
+                    src={selectedSeller.pic_ktp_file_url}
+                    className="w-48 h-48 object-cover border-2 border-gray-300 rounded-lg cursor-pointer hover:border-[var(--teal)] transition-colors mx-auto"
+                    alt="Foto KTP"
+                  />
+                  <p className="text-sm text-gray-500 mt-2">Klik untuk zoom</p>
+                </div>
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setSelectedSeller(null)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Tutup
+                </button>
+                <button
+                  onClick={() => handleVerify("rejected")}
+                  className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  Tolak
+                </button>
+                <button
+                  onClick={() => handleVerify("accepted")}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors"
+                >
+                  Verifikasi
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ZOOM MODAL */}
+      {/* ZOOM IMAGE */}
       {zoomImage && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
           onClick={() => setZoomImage(null)}
         >
-          <img
-            src={zoomImage}
-            className="max-w-[90%] max-h-[90%] rounded-lg border-4 border-white"
-          />
+          <div className="relative max-w-4xl max-h-full">
+            <button
+              onClick={() => setZoomImage(null)}
+              className="absolute -top-12 right-0 text-white text-2xl hover:text-gray-300"
+            >
+              × Tutup
+            </button>
+            <img
+              src={zoomImage}
+              className="max-w-full max-h-full rounded-lg"
+              alt="Zoom"
+            />
+          </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
