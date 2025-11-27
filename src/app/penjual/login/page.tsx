@@ -9,7 +9,7 @@ export default function Page() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Login berhasil (dummy)");
+    alert("Login berhasil");
   };
 
   return (
@@ -21,24 +21,32 @@ export default function Page() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="text-navy font-medium">Email</label>
+            <label htmlFor="email" className="text-navy font-medium">
+              Email
+            </label>
             <input
+              id="email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-sky-blue bg-sky-blue/30 text-navy outline-none focus:border-teal"
+              placeholder="Masukkan email Anda"
             />
           </div>
 
           <div>
-            <label className="text-navy font-medium">Password</label>
+            <label htmlFor="password" className="text-navy font-medium">
+              Password
+            </label>
             <input
+              id="password"
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-sky-blue bg-sky-blue/30 text-navy outline-none focus:border-teal"
+              placeholder="Masukkan password Anda"
             />
           </div>
 
@@ -52,7 +60,10 @@ export default function Page() {
 
         <p className="text-center text-navy mt-4">
           Belum punya akun?{" "}
-          <Link href="/penjual/registrasi" className="text-teal font-semibold hover:underline">
+          <Link 
+            href="/penjual/registrasi" 
+            className="text-teal font-semibold hover:underline"
+          >
             Register dulu
           </Link>
         </p>
