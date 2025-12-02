@@ -13,7 +13,7 @@ interface RegistrasiRequest {
   jalan: string;
   rt: string;
   rw: string;
-  kelurahan: string;
+  kelurahan: string;   
   kota: string;
   provinsi: string;
   ktpPIC: string;
