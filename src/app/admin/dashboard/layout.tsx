@@ -2,16 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [loading, setLoading] = useState(false);
 
   const menu = [
     { label: "Verifikasi Penjual", href: "/admin/dashboard/verifikasi" },
     { label: "Statistik", href: "/admin/dashboard/statistics" },
     { label: "Laporan", href: "/admin/dashboard/laporan" },
-];
+  ];
 
+  async function handleLogout() {
+    setLoading(true);
+
+    // Jalankan API logout
+    await fetch("/api/admin/logout", { method: "POST" });
+
+    // Redirect paksa ke /admin (bukan /admin/login)
+    window.location.href = "/admin";
+
+    setLoading(false);
+  }
 
   return (
     <div
@@ -50,6 +63,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </Link>
             );
           })}
+
+          {/* LOGOUT BUTTON */}
+          <button
+            onClick={handleLogout}
+            disabled={loading}
+            className="mt-8 px-3 py-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition disabled:opacity-50"
+          >
+            {loading ? "Logging out..." : "Logout"}
+          </button>
         </aside>
 
         {/* MAIN CONTENT */}
