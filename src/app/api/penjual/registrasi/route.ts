@@ -1,24 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Define interface for the request body
-interface RegistrasiRequest {
-  namaToko: string;
-  deskripsi: string;
-  namaPIC: string;
-  noHPPIC: string;
-  emailPIC: string;
-  jalan: string;
-  rt: string;
-  rw: string;
-  kelurahan: string;
-  kota: string;
-  provinsi: string;
-  ktpPIC: string;
-}
-
 // Type untuk data registration
 interface RegistrationData {
+  store_name: string
+  description: string | null
+  pic_name: string
+  pic_phone: string
+  pic_email: string
+  pic_address: string | null
+  rt: string | null
+  rw: string | null
+  kelurahan: string | null
+  kecamatan: string | null
+  city: string | null
+  province: string | null
+  pic_ktp: string | null
+  pic_photo_url: string
+  pic_ktp_file_url: string
+  verification_status: string
+  verified: boolean
+  is_active: boolean
+  created_at: string
+}
+
+// Interface untuk response API
+interface RegistrationResponse {
+  success: boolean
+  message?: string
+  error?: string
+  details?: string
+  hint?: string
+  data?: {
+    id: string | number
+    store_name: string
+    pic_name: string
+    pic_email: string
+    verification_status: string
+    created_at: string
+    registration_number: string
+  }
+}
+
+// Interface untuk seller data dari database
+interface SellerData {
+  id: string | number
   store_name: string
   description: string | null
   pic_name: string
@@ -310,17 +336,20 @@ export async function POST(request: NextRequest) {
 
     console.log('=== REGISTRATION COMPLETE ===')
 
+    // Cast dbData ke SellerData untuk akses properti yang aman
+    const sellerData = dbData as SellerData
+
     return NextResponse.json<RegistrationResponse>({
       success: true,
       message: 'Registrasi berhasil! Data Anda sedang dalam proses verifikasi.',
       data: {
-        id: dbData.id,
-        store_name: dbData.store_name,
-        pic_name: dbData.pic_name,
-        pic_email: dbData.pic_email,
-        verification_status: dbData.verification_status,
-        created_at: dbData.created_at,
-        registration_number: `REG-${String(dbData.id).padStart(6, '0')}`
+        id: sellerData.id,
+        store_name: sellerData.store_name,
+        pic_name: sellerData.pic_name,
+        pic_email: sellerData.pic_email,
+        verification_status: sellerData.verification_status,
+        created_at: sellerData.created_at,
+        registration_number: `REG-${String(sellerData.id).padStart(6, '0')}`
       }
     }, { status: 201 })
 

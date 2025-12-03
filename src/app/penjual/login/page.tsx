@@ -39,13 +39,14 @@ export default function Page() {
       }
 
       // Login dengan Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        setError(error.message);
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
         return;
       }
 
@@ -54,8 +55,13 @@ export default function Page() {
         alert("Login berhasil!");
         router.push("/penjual/dashboard");
       }
-    } catch (err: any) {
-      setError(err.message || "Terjadi kesalahan");
+    } catch (err) {
+      // Menangani error dengan tipe yang spesifik
+      if (err instanceof Error) {
+        setError(err.message || "Terjadi kesalahan");
+      } else {
+        setError("Terjadi kesalahan yang tidak diketahui");
+      }
     } finally {
       setLoading(false);
     }

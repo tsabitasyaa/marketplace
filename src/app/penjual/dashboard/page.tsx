@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  AreaChart, Area
+  AreaChart, Area, Cell
 } from "recharts";
 
 interface Product {
@@ -77,7 +77,6 @@ export default function DashboardPenjual() {
     visitorsWithComments: 120
   });
   const [categories, setCategories] = useState<CategoryData[]>([]);
-  const [_, setProvinces] = useState<ProvinceData[]>([]); // Unused but kept for future
   const [monthlyVisitors, setMonthlyVisitors] = useState<MonthlyVisitorData[]>([]);
   const [ratingDistribution, setRatingDistribution] = useState<RatingDistribution[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,132 +98,136 @@ export default function DashboardPenjual() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Dummy data generator
-  const generateRandomSold = () => Math.floor(Math.random() * 50) + 10;
-  const generateRandomRating = () => parseFloat((3.5 + Math.random() * 1.5).toFixed(1));
-  const generateRandomVisitors = () => Math.floor(Math.random() * 200) + 100;
-  const generateRandomComments = () => Math.floor(Math.random() * 60) + 20;
-  const generateRandomSoldMonth = () => Math.floor(Math.random() * 40) + 30;
-
-  const mockProducts: Product[] = [
-    {
-      id: 1,
-      name: "Sepatu Running Premium",
-      category: "Sepatu",
-      price: 250000,
-      stock: 15,
-      sold: 42,
-      rating: 4.7,
-      image: "/product-image.png",
-      createdAt: "2024-01-15"
-    },
-    {
-      id: 2,
-      name: "Baju Kaos Cotton Combed",
-      category: "Pakaian",
-      price: 75000,
-      stock: 15,
-      sold: 28,
-      rating: 4.5,
-      image: "/product1.jpg",
-      createdAt: "2024-01-20"
-    },
-    {
-      id: 3,
-      name: "Celana Jeans Slim Fit",
-      category: "Pakaian",
-      price: 250000,
-      stock: 3,
-      sold: 15,
-      rating: 4.2,
-      image: "/product2.jpg",
-      createdAt: "2024-02-05"
-    },
-    {
-      id: 4,
-      name: "Sepatu Sneakers Casual",
-      category: "Sepatu",
-      price: 350000,
-      stock: 8,
-      sold: 38,
-      rating: 4.8,
-      image: "/product3.jpg",
-      createdAt: "2024-02-10"
-    },
-    {
-      id: 5,
-      name: "Tas Ransel Outdoor",
-      category: "Aksesoris",
-      price: 180000,
-      stock: 1,
-      sold: 12,
-      rating: 4.0,
-      image: "/product4.jpg",
-      createdAt: "2024-02-15"
-    },
-    {
-      id: 6,
-      name: "Jam Tangan Digital",
-      category: "Aksesoris",
-      price: 120000,
-      stock: 12,
-      sold: 25,
-      rating: 4.7,
-      image: "/product5.jpg",
-      createdAt: "2024-03-01"
-    },
-    {
-      id: 7,
-      name: "Kemeja Flanel",
-      category: "Pakaian",
-      price: 189000,
-      stock: 6,
-      sold: 18,
-      rating: 4.3,
-      image: "/product6.jpg",
-      createdAt: "2024-03-05"
-    },
-    {
-      id: 8,
-      name: "Topi Baseball",
-      category: "Aksesoris",
-      price: 65000,
-      stock: 20,
-      sold: 32,
-      rating: 4.1,
-      image: "/product7.jpg",
-      createdAt: "2024-03-10"
-    },
-    {
-      id: 9,
-      name: "Dompet Kulit",
-      category: "Aksesoris",
-      price: 95000,
-      stock: 4,
-      sold: 21,
-      rating: 4.6,
-      image: "/product8.jpg",
-      createdAt: "2024-03-15"
-    },
-    {
-      id: 10,
-      name: "Sepatu Formal",
-      category: "Sepatu",
-      price: 450000,
-      stock: 7,
-      sold: 35,
-      rating: 4.9,
-      image: "/product9.jpg",
-      createdAt: "2024-03-20"
-    }
-  ];
+  const generateRandomSold = useCallback(() => Math.floor(Math.random() * 50) + 10, []);
+  const generateRandomRating = useCallback(() => parseFloat((3.5 + Math.random() * 1.5).toFixed(1)), []);
+  const generateRandomVisitors = useCallback(() => Math.floor(Math.random() * 200) + 100, []);
+  const generateRandomComments = useCallback(() => Math.floor(Math.random() * 60) + 20, []);
+  const generateRandomSoldMonth = useCallback(() => Math.floor(Math.random() * 40) + 30, []);
 
   const COLORS = ['#567C8D', '#2F4156', '#C8D9E6', '#94A9C9', '#6B8BA4', '#3A506B'];
+
+  // Initialize mock products
+  const getMockProducts = useCallback((): Product[] => {
+    return [
+      {
+        id: 1,
+        name: "Sepatu Running Premium",
+        category: "Sepatu",
+        price: 250000,
+        stock: 15,
+        sold: 42,
+        rating: 4.7,
+        image: "/product-image.png",
+        createdAt: "2024-01-15"
+      },
+      {
+        id: 2,
+        name: "Baju Kaos Cotton Combed",
+        category: "Pakaian",
+        price: 75000,
+        stock: 15,
+        sold: 28,
+        rating: 4.5,
+        image: "/product1.jpg",
+        createdAt: "2024-01-20"
+      },
+      {
+        id: 3,
+        name: "Celana Jeans Slim Fit",
+        category: "Pakaian",
+        price: 250000,
+        stock: 3,
+        sold: 15,
+        rating: 4.2,
+        image: "/product2.jpg",
+        createdAt: "2024-02-05"
+      },
+      {
+        id: 4,
+        name: "Sepatu Sneakers Casual",
+        category: "Sepatu",
+        price: 350000,
+        stock: 8,
+        sold: 38,
+        rating: 4.8,
+        image: "/product3.jpg",
+        createdAt: "2024-02-10"
+      },
+      {
+        id: 5,
+        name: "Tas Ransel Outdoor",
+        category: "Aksesoris",
+        price: 180000,
+        stock: 1,
+        sold: 12,
+        rating: 4.0,
+        image: "/product4.jpg",
+        createdAt: "2024-02-15"
+      },
+      {
+        id: 6,
+        name: "Jam Tangan Digital",
+        category: "Aksesoris",
+        price: 120000,
+        stock: 12,
+        sold: 25,
+        rating: 4.7,
+        image: "/product5.jpg",
+        createdAt: "2024-03-01"
+      },
+      {
+        id: 7,
+        name: "Kemeja Flanel",
+        category: "Pakaian",
+        price: 189000,
+        stock: 6,
+        sold: 18,
+        rating: 4.3,
+        image: "/product6.jpg",
+        createdAt: "2024-03-05"
+      },
+      {
+        id: 8,
+        name: "Topi Baseball",
+        category: "Aksesoris",
+        price: 65000,
+        stock: 20,
+        sold: 32,
+        rating: 4.1,
+        image: "/product7.jpg",
+        createdAt: "2024-03-10"
+      },
+      {
+        id: 9,
+        name: "Dompet Kulit",
+        category: "Aksesoris",
+        price: 95000,
+        stock: 4,
+        sold: 21,
+        rating: 4.6,
+        image: "/product8.jpg",
+        createdAt: "2024-03-15"
+      },
+      {
+        id: 10,
+        name: "Sepatu Formal",
+        category: "Sepatu",
+        price: 450000,
+        stock: 7,
+        sold: 35,
+        rating: 4.9,
+        image: "/product9.jpg",
+        createdAt: "2024-03-20"
+      }
+    ];
+  }, []);
 
   useEffect(() => {
     const savedProducts = localStorage.getItem('dashboard_products');
     if (savedProducts) {
       setProducts(JSON.parse(savedProducts));
     } else {
+      const mockProducts = getMockProducts();
       const productsWithSold = mockProducts.map(product => ({
         ...product,
         sold: generateRandomSold(),
@@ -232,7 +235,7 @@ export default function DashboardPenjual() {
       }));
       setProducts(productsWithSold);
     }
-  }, []);
+  }, [getMockProducts, generateRandomSold]);
 
   useEffect(() => {
     if (products.length > 0) {
@@ -246,9 +249,8 @@ export default function DashboardPenjual() {
       try {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        const currentProducts = products.length > 0 ? products : mockProducts;
+        const currentProducts = products.length > 0 ? products : getMockProducts();
         
-        // Generate dummy data for charts
         const categoryCounts: Record<string, number> = {};
         const categorySold: Record<string, number> = {};
         
@@ -266,16 +268,6 @@ export default function DashboardPenjual() {
         }));
         setCategories(mockCategories);
 
-        const mockProvinces: ProvinceData[] = [
-          { province: "Jawa Barat", storeCount: 12, percentage: 37.5, color: COLORS[0] },
-          { province: "DKI Jakarta", storeCount: 8, percentage: 25.0, color: COLORS[1] },
-          { province: "Jawa Tengah", storeCount: 6, percentage: 18.8, color: COLORS[2] },
-          { province: "Jawa Timur", storeCount: 4, percentage: 12.5, color: COLORS[3] },
-          { province: "Banten", storeCount: 2, percentage: 6.2, color: COLORS[4] }
-        ];
-        setProvinces(mockProvinces);
-
-        // Generate monthly dummy data
         const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
         const mockMonthlyVisitors: MonthlyVisitorData[] = months.slice(0, 6).map((month) => ({
           month,
@@ -286,7 +278,6 @@ export default function DashboardPenjual() {
         }));
         setMonthlyVisitors(mockMonthlyVisitors);
         
-        // Generate rating distribution dummy data
         const ratingData: RatingDistribution[] = [
           { rating: 5, count: 45, percentage: 35, color: "#567C8D" },
           { rating: 4, count: 60, percentage: 46, color: "#2F4156" },
@@ -296,13 +287,11 @@ export default function DashboardPenjual() {
         ];
         setRatingDistribution(ratingData);
         
-        // Calculate statistics
         const lowStockProducts = currentProducts.filter(product => product.stock < 2).length;
         const averageRating = currentProducts.reduce((acc, product) => acc + product.rating, 0) / totalProducts;
         const totalRevenue = currentProducts.reduce((acc, product) => acc + (product.price * product.sold), 0);
         const totalSold = currentProducts.reduce((acc, product) => acc + product.sold, 0);
 
-        // Update dummy visitor stats
         const totalVisitors = mockMonthlyVisitors.reduce((acc, month) => acc + month.visitors, 0);
         const totalRatingComments = mockMonthlyVisitors.reduce((acc, month) => acc + month.comments, 0);
 
@@ -315,7 +304,7 @@ export default function DashboardPenjual() {
           totalRevenue,
           totalVisitors,
           ratingComments: totalRatingComments,
-          visitorsWithComments: Math.floor(totalVisitors * 0.25) // 25% visitors leave comments
+          visitorsWithComments: Math.floor(totalVisitors * 0.25)
         }));
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -325,7 +314,7 @@ export default function DashboardPenjual() {
     };
 
     fetchData();
-  }, [products, COLORS]);
+  }, [products, COLORS, getMockProducts, generateRandomVisitors, generateRandomComments, generateRandomSoldMonth]);
 
   const generateReport = () => {
     let dataToExport: Product[] = [];
@@ -454,6 +443,35 @@ export default function DashboardPenjual() {
             margin-top: 20px;
             border-radius: 4px;
           }
+          .center-text {
+            text-align: center;
+          }
+          .green-bold {
+            color: #2e7d32;
+            font-weight: bold;
+          }
+          .no-print {
+            display: block;
+          }
+          .print-button {
+            background-color: #567C8D;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+          }
+          .close-button {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+          }
           @media print {
             body {
               margin: 0;
@@ -487,9 +505,9 @@ export default function DashboardPenjual() {
               <th>Nama Produk</th>
               <th>Kategori</th>
               <th>Harga</th>
-              <th>Stok</th>
-              <th>Terjual</th>
-              <th>Rating</th>
+              <th class="center-text">Stok</th>
+              <th class="center-text">Terjual</th>
+              <th class="center-text">Rating</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -500,9 +518,9 @@ export default function DashboardPenjual() {
                 <td>${product.name}</td>
                 <td>${product.category}</td>
                 <td>${formatCurrency(product.price)}</td>
-                <td style="text-align: center;">${product.stock}</td>
-                <td style="text-align: center; color: #2e7d32; font-weight: bold;">${product.sold}</td>
-                <td style="text-align: center;">${product.rating}</td>
+                <td class="center-text">${product.stock}</td>
+                <td class="center-text green-bold">${product.sold}</td>
+                <td class="center-text">${product.rating}</td>
                 <td>
                   <span class="${
                     product.stock < 2 
@@ -531,27 +549,10 @@ export default function DashboardPenjual() {
         </div>
         
         <div class="no-print" style="margin-top: 30px; text-align: center; padding: 20px;">
-          <button onclick="window.print()" style="
-            background-color: #567C8D;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-right: 10px;
-          ">
+          <button onclick="window.print()" class="print-button">
             🖨️ Cetak Laporan
           </button>
-          <button onclick="window.close()" style="
-            background-color: #f44336;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-          ">
+          <button onclick="window.close()" class="close-button">
             ❌ Tutup
           </button>
         </div>
@@ -680,9 +681,7 @@ export default function DashboardPenjual() {
   };
 
   const handleLogout = () => {
-    // Clear localStorage
     localStorage.removeItem('dashboard_products');
-    // Redirect to login page
     router.push('/penjual/login');
   };
 
@@ -695,13 +694,13 @@ export default function DashboardPenjual() {
           <div className="flex justify-end space-x-3">
             <button
               onClick={() => setShowLogoutConfirm(false)}
-              className="px-4 py-2 border border-[var(--color-sky-blue)] text-[var(--color-navy)] rounded-lg hover:bg-[var(--color-sky-blue)] transition-colors"
+              className="px-4 py-2 border border-[var(--color-sky-blue)] text-[var(--color-navy)] rounded-lg hover:bg-[var(--color-sky-blue)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
             >
               Batal
             </button>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
             >
               Logout
             </button>
@@ -776,7 +775,7 @@ export default function DashboardPenjual() {
             </div>
             <div className="rounded-full bg-yellow-100 p-3">
               <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.364-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
               </svg>
             </div>
           </div>
@@ -986,7 +985,7 @@ export default function DashboardPenjual() {
 
           <button
             onClick={generateReport}
-            className="bg-[var(--color-teal)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-navy)] transition-colors flex items-center"
+            className="bg-[var(--color-teal)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-navy)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
             aria-label="Generate PDF laporan"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1119,7 +1118,7 @@ export default function DashboardPenjual() {
         
         <button
           onClick={() => setActiveView('tambah-produk')}
-          className="bg-[var(--color-teal)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-navy)] transition-colors flex items-center"
+          className="bg-[var(--color-teal)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-navy)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
           aria-label="Tambah produk baru"
         >
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1198,7 +1197,7 @@ export default function DashboardPenjual() {
                 <td className="px-6 py-4 whitespace-nowrap space-x-2">
                   <button
                     onClick={() => handleEditProduct(product)}
-                    className="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                    className="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
                     aria-label={`Edit produk ${product.name}`}
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1208,7 +1207,7 @@ export default function DashboardPenjual() {
                   </button>
                   <button
                     onClick={() => handleDeleteProduct(product.id)}
-                    className="inline-flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                    className="inline-flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
                     aria-label={`Hapus produk ${product.name}`}
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1567,7 +1566,7 @@ export default function DashboardPenjual() {
                       <td className="border border-gray-300 p-2 text-sm">{product.category}</td>
                       <td className="border border-gray-300 p-2 text-sm">{formatCurrency(product.price)}</td>
                       <td className="border border-gray-300 p-2 text-sm text-center">{product.stock}</td>
-                      <td className="border border-gray-300 p-2 text-sm text-center" style={{color: '#2e7d32', fontWeight: 'bold'}}>
+                      <td className="border border-gray-300 p-2 text-sm text-center green-bold">
                         {product.sold}
                       </td>
                       <td className="border border-gray-300 p-2 text-sm text-center">{product.rating}</td>
