@@ -1,56 +1,71 @@
-// /app/api/admin/pending/route.ts - PERBAIKAN
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+// app/api/admin/pending/route.js
+import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function GET() {
   try {
-    console.log("🔄 [FIXED API] Fetching pending sellers...");
-    
-    // PERBAIKAN: Hapus filter is_active = false, karena data punya is_active = true
-    const { data: sellers, error } = await supabase
-      .from("sellers")
-      .select("*")
-      .or('verified.is.false,verification_status.eq.pending,verification_status.is.null')
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("❌ Database error:", error);
+    if (!supabaseUrl || !supabaseServiceKey) {
       return NextResponse.json(
-        { 
-          success: false, 
-          message: "Gagal mengambil data dari database" 
-        },
+        { success: false, message: 'Database configuration missing' },
         { status: 500 }
       );
     }
 
-    console.log(`✅ Found ${sellers?.length || 0} pending sellers`);
-    
-    // Log untuk debugging
-    if (sellers && sellers.length > 0) {
-      sellers.forEach(seller => {
-        console.log(`📝 ${seller.store_name}: verified=${seller.verified}, status=${seller.verification_status}, active=${seller.is_active}`);
-      });
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Query untuk mengambil penjual dengan status 'pending'
+    const { data: sellers, error } = await supabase
+      .from('sellers')
+      .select(`
+        id,
+        user_id,
+        store_name,
+        description,
+        pic_name,
+        pic_phone,
+        pic_email,
+        pic_address,
+        rt,
+        rw,
+        kelurahan,
+        city,
+        province,
+        pic_ktp,
+        pic_photo_url,
+        pic_ktp_file_url,
+        verification_status,
+        created_at,
+        is_active
+      `)
+      .eq('verification_status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Database error:', error);
+      return NextResponse.json(
+        { success: false, message: 'Gagal mengambil data penjual', error: error.message },
+        { status: 500 }
+      );
     }
+
+    // Filter hanya yang belum diverifikasi
+    const pendingSellers = (sellers || []).filter(seller => 
+      seller.verification_status === 'pending'
+    );
 
     return NextResponse.json({
       success: true,
-      data: sellers || [],
-      count: sellers?.length || 0,
-      note: "Filter: verified=false OR verification_status=pending OR verification_status IS NULL"
+      data: pendingSellers,
+      count: pendingSellers.length
     });
 
-  } catch (error: any) {
-    console.error("❌ System error:", error);
+  } catch (error) {
+    console.error('Server error:', error);
     return NextResponse.json(
-      { 
-        success: false, 
-        message: "Terjadi kesalahan sistem" 
-      },
+      { success: false, message: 'Internal server error' },
       { status: 500 }
     );
   }
