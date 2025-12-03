@@ -157,8 +157,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white text-navy flex flex-col">
-      {/* HEADER */}
-      <header className="w-full bg-teal text-white py-4 px-6 flex items-center justify-between shadow">
+      {/* HEADER - FIXED */}
+      <header className="fixed top-0 left-0 right-0 bg-teal text-white py-4 px-6 flex items-center justify-between shadow z-50">
         <div className="flex items-center gap-3">
           <img
             src="/Loopy Logo.jpg"
@@ -185,9 +185,11 @@ export default function Home() {
         </button>
       </header>
 
-      <div className="flex">
-        {/* SIDEBAR FILTER */}
-        <aside className="w-64 bg-beige text-navy min-h-screen p-4 space-y-6">
+      {/* MAIN CONTENT WRAPPER */}
+      <div className="flex pt-16"> {/* pt-16 untuk offset header fixed */}
+        
+        {/* SIDEBAR - STICKY */}
+        <aside className="w-64 bg-beige text-navy min-h-screen p-4 space-y-6 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
           <p className="font-bold text-lg">FILTER</p>
 
           {/* CATEGORY FILTER */}
@@ -268,7 +270,7 @@ export default function Home() {
           )}
         </aside>
 
-        {/* MAIN CONTENT */}
+        {/* MAIN CONTENT - SCROLLABLE */}
         <main className="flex-1 p-8">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-semibold">Our Products</h2>

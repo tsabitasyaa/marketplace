@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Type untuk response
-interface RegistrationResponse {
-  success: boolean
-  message?: string
-  error?: string
-  details?: string
-  hint?: string
-  data?: {
-    id: number
-    store_name: string
-    pic_name: string
-    pic_email: string
-    verification_status: string
-    created_at: string
-    registration_number: string
-  }
+// Define interface for the request body
+interface RegistrasiRequest {
+  namaToko: string;
+  deskripsi: string;
+  namaPIC: string;
+  noHPPIC: string;
+  emailPIC: string;
+  jalan: string;
+  rt: string;
+  rw: string;
+  kelurahan: string;
+  kota: string;
+  provinsi: string;
+  ktpPIC: string;
 }
 
 // Type untuk data registration

@@ -5,7 +5,7 @@ import Link from "next/link";
 type ProductCardProps = {
   id: number;
   name: string;
-  price: string;
+  price: number;
   category: string;
   rating: string;
   storeName: string;
@@ -13,6 +13,15 @@ type ProductCardProps = {
   image: string;
   reviewCount: number;
 };
+
+  // Format currency
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(price);
+  };
 
 export default function ProductCard({
   id,
@@ -52,7 +61,7 @@ export default function ProductCard({
             </h3>
 
             {/* PRICE */}
-            <p className="text-teal font-semibold text-md">{price}</p>
+            <p className="text-teal font-semibold text-md">{formatPrice(price)}</p>
 
             {/* RATING */}
             <div className="flex items-center gap-1 text-amber-500 text-sm font-medium">
