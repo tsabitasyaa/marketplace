@@ -14,6 +14,7 @@ interface Seller {
   rt: string | null;
   rw: string | null;
   kelurahan: string | null; // nama field sesuai schema (kelurahan, bukan kelunihan)
+  kecamatan: string | null;
   city: string | null;
   province: string | null;
   pic_ktp: string; // nama field sesuai schema (ktp, bukan kip)
@@ -556,6 +557,12 @@ export default function VerifikasiPage() {
                         <label className="block text-sm text-gray-500 mb-1">Kelurahan</label>
                         <p className="text-gray-700">
                           {selectedSeller.kelurahan || <span className="text-gray-400">-</span>}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-500 mb-1">Kecamatan</label>
+                        <p className="text-gray-700">
+                          {selectedSeller.kecamatan || <span className="text-gray-400">-</span>}
                         </p>
                       </div>
                       <div>

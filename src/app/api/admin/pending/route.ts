@@ -31,6 +31,7 @@ export async function GET() {
         rt,
         rw,
         kelurahan,
+        kecamatan,
         city,
         province,
         pic_ktp,
