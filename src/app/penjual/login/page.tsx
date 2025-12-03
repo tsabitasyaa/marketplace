@@ -2,14 +2,69 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
 export default function Page() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Login berhasil");
+    setLoading(true);
+    setError("");
+
+    try {
+      // Pertama, cek role user di database
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("email", email)
+        .single();
+
+      if (userError || !userData) {
+        setError("Email atau password salah");
+        setLoading(false);
+        return;
+      }
+
+      // Pastikan user adalah penjual
+      if (userData.role !== "seller" && userData.role !== "penjual") {
+        setError("Hanya penjual yang dapat login di sini");
+        setLoading(false);
+        return;
+      }
+
+      // Login dengan Supabase Auth
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Redirect ke dashboard penjual
+        alert("Login berhasil!");
+        router.push("/penjual/dashboard");
+      }
+    } catch (err) {
+      // Menangani error dengan tipe yang spesifik
+      if (err instanceof Error) {
+        setError(err.message || "Terjadi kesalahan");
+      } else {
+        setError("Terjadi kesalahan yang tidak diketahui");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -18,6 +73,12 @@ export default function Page() {
         <h2 className="text-2xl font-bold text-navy text-center mb-6">
           Login Penjual
         </h2>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
@@ -32,6 +93,7 @@ export default function Page() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-sky-blue bg-sky-blue/30 text-navy outline-none focus:border-teal"
               placeholder="Masukkan email Anda"
+              disabled={loading}
             />
           </div>
 
@@ -47,14 +109,16 @@ export default function Page() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 rounded-lg border border-sky-blue bg-sky-blue/30 text-navy outline-none focus:border-teal"
               placeholder="Masukkan password Anda"
+              disabled={loading}
             />
           </div>
 
           <button
             type="submit"
-            className="mt-4 w-full bg-teal text-white py-2 rounded-lg font-semibold hover:bg-navy transition"
+            disabled={loading}
+            className="mt-4 w-full bg-teal text-white py-2 rounded-lg font-semibold hover:bg-navy transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Login
+            {loading ? "Memproses..." : "Login"}
           </button>
         </form>
 
