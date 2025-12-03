@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { sendThankYouEmail } from "@/lib/review/email-service";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validasi format email
+    // Validasi email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(user_email)) {
       return NextResponse.json(
@@ -58,34 +59,41 @@ export async function POST(request: Request) {
       );
     }
 
-    // CEK DUPLICATE DENGAN QUERY YANG LEBIH ROBUST
-    console.log(`🔍 Checking duplicate review for product ${product_id} and email ${user_email}`);
-    
+    // CEK DUPLICATE REVIEW
     const { data: existingReview, error: checkError } = await supabase
       .from("reviews")
       .select("id, user_name, created_at")
       .eq("product_id", product_id)
-      .eq("user_email", user_email.trim().toLowerCase()) // Normalize email
+      .eq("user_email", user_email.trim().toLowerCase())
       .maybeSingle();
 
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error("❌ Error checking existing review:", checkError);
-    }
-
     if (existingReview) {
-      console.log(`❌ Duplicate found: User ${existingReview.user_name} already reviewed on ${existingReview.created_at}`);
       return NextResponse.json(
         { 
           success: false, 
-          message: `Email ${user_email} sudah memberikan review untuk produk ini. Setiap email hanya boleh memberikan satu review per produk.` 
+          message: `Email ${user_email} sudah memberikan review untuk produk ini.` 
         },
-        { status: 409 } // Conflict
+        { status: 409 }
       );
     }
 
-    console.log("✅ No duplicate found, proceeding with insert...");
+    // AMBIL DATA PRODUK UNTUK EMAIL
+    let productName = "Produk";
+    try {
+      const { data: productData } = await supabase
+        .from("products")
+        .select("name")
+        .eq("id", product_id)
+        .single();
+      
+      if (productData) {
+        productName = productData.name;
+      }
+    } catch (error) {
+      console.error("❌ Error fetching product data:", error);
+    }
 
-    // Insert review ke database
+    // INSERT REVIEW KE DATABASE
     const { data, error } = await supabase
       .from("reviews")
       .insert([
@@ -93,7 +101,7 @@ export async function POST(request: Request) {
           product_id: parseInt(product_id),
           user_name: user_name.trim(),
           user_phone: user_phone ? user_phone.trim() : null,
-          user_email: user_email.trim().toLowerCase(), // Normalize email
+          user_email: user_email.trim().toLowerCase(),
           user_province: user_province ? user_province.trim() : null,
           rating: parseInt(rating),
           comment: comment.trim(),
@@ -105,12 +113,11 @@ export async function POST(request: Request) {
     if (error) {
       console.error("❌ Supabase insert error:", error);
       
-      // Handle unique constraint violation
       if (error.code === '23505') {
         return NextResponse.json(
           { 
             success: false, 
-            message: `Email ${user_email} sudah memberikan review untuk produk ini. Silakan gunakan email lain.` 
+            message: `Email ${user_email} sudah memberikan review untuk produk ini.` 
           },
           { status: 409 }
         );
@@ -127,9 +134,28 @@ export async function POST(request: Request) {
 
     console.log(`✅ Review submitted successfully for product ${product_id}`);
 
+    // 🔥 KIRIM EMAIL TERIMA KASIH (Async - tidak blocking)
+    try {
+      const emailResult = await sendThankYouEmail(
+        user_email,
+        user_name,
+        productName
+      );
+
+      if (emailResult.success) {
+        console.log('✅ Thank you email sent successfully');
+      } else {
+        console.log('⚠️ Email sending failed, but review was saved:', emailResult.message);
+      }
+
+    } catch (emailError) {
+      console.error('⚠️ Email sending error (non-critical):', emailError);
+      // Jangan gagalkan review hanya karena email gagal
+    }
+
     return NextResponse.json({
       success: true,
-      message: "Review berhasil dikirim! Terima kasih atas feedback Anda.",
+      message: "Review berhasil dikirim! Email ucapan terima kasih telah dikirim ke inbox Anda.",
       data: data[0]
     });
 
