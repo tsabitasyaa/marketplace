@@ -4,14 +4,6 @@
 import React, { useState } from "react";
 
 export default function AdminLoginPage() {
-  const colorPalette = {
-    "--navy": "#2F4156",
-    "--teal": "#567C8D",
-    "--sky": "#C8D9E6",
-    "--beige": "#F5EFEB",
-    "--white": "#FFFFFF",
-  } as React.CSSProperties;
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -74,15 +66,15 @@ export default function AdminLoginPage() {
   return (
     <div
       className="min-h-screen flex items-center justify-center"
-      style={{ backgroundColor: colorPalette["--beige"] }}
+      style={{ backgroundColor: "var(--color-beige)" }}
     >
       <div
-        className="bg-white p-8 rounded-lg shadow-xl w-80 border-t-4 border-[var(--teal)]"
-        style={{ ...colorPalette, borderTopColor: colorPalette["--teal"] }}
+        className="bg-white p-8 rounded-lg shadow-xl w-80 border-t-4 border-[var(--color-teal)]"
+        style={{ borderTopColor: "var(--color-teal)" }}
       >
         <h1
           className="text-2xl font-extrabold mb-6 text-center"
-          style={{ color: colorPalette["--navy"] }}
+          style={{ color: "var(--color-navy)" }}
         >
           Loopy Admin Login
         </h1>
@@ -102,8 +94,8 @@ export default function AdminLoginPage() {
             disabled={loading}
             className="border p-3 rounded-md focus:outline-none focus:ring-2 transition duration-200"
             style={{
-              borderColor: colorPalette["--sky"],
-              "--tw-ring-color": colorPalette["--teal"],
+              borderColor: "var(--color-sky)",
+              "--tw-ring-color": "var(--color-teal)",
             } as React.CSSProperties}
           />
 
@@ -115,8 +107,8 @@ export default function AdminLoginPage() {
             disabled={loading}
             className="border p-3 rounded-md focus:outline-none focus:ring-2 transition duration-200"
             style={{
-              borderColor: colorPalette["--sky"],
-              "--tw-ring-color": colorPalette["--teal"],
+              borderColor: "var(--color-sky)",
+              "--tw-ring-color": "var(--color-teal)",
             } as React.CSSProperties}
           />
 
@@ -131,8 +123,8 @@ export default function AdminLoginPage() {
             style={{
               backgroundColor: loading
                 ? "#ccc"
-                : colorPalette["--teal"],
-              color: colorPalette["--white"],
+                : "var(--color-teal)",
+              color: "var(--color-white)",
             }}
           >
             {loading ? "Memproses..." : "Masuk"}
@@ -140,7 +132,7 @@ export default function AdminLoginPage() {
         </form>
 
         <p className="text-xs text-center mt-6 text-gray-500">
-          <span style={{ color: colorPalette["--navy"] }}>
+          <span style={{ color: "var(--color-navy)" }}>
             &copy; Loopy 2025
           </span>
         </p>
