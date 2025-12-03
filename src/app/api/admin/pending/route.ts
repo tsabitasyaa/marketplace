@@ -1,50 +1,55 @@
+// /app/api/admin/pending/route.ts - PERBAIKAN
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET() {
   try {
-    console.log("🔄 [API ADMIN PENDING] Fetching pending sellers...");
+    console.log("🔄 [FIXED API] Fetching pending sellers...");
     
-    // Untuk testing, kembalikan data dummy dulu
-    const dummyData = [
-      {
-        id: "1",
-        user_id: "101",
-        store_name: "Yelisa Fashion Boutique",
-        description: "Toko fashion modern untuk wanita",
-        pic_name: "Yelisa Lorian",
-        pic_phone: "081234567890",
-        pic_email: "yelisa@example.com",
-        pic_address: "Jl. Kemanggisan No. 123",
-        rt: "001",
-        rw: "002",
-        kelurahan: "Kemanggisan",
-        kecamatan: "Palmerah",
-        city: "Jakarta Barat",
-        province: "DKI Jakarta",
-        pic_ktp: "3171234567890001",
-        pic_photo_url: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=300&fit=crop",
-        pic_ktp_file_url: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&h=300&fit=crop",
-        verified: false,
-        verification_status: "pending",
-        created_at: "2025-11-28T10:00:00.000Z"
-      }
-    ];
+    // PERBAIKAN: Hapus filter is_active = false, karena data punya is_active = true
+    const { data: sellers, error } = await supabase
+      .from("sellers")
+      .select("*")
+      .or('verified.is.false,verification_status.eq.pending,verification_status.is.null')
+      .order("created_at", { ascending: false });
 
-    console.log(`✅ [API ADMIN PENDING] Returning ${dummyData.length} dummy sellers`);
+    if (error) {
+      console.error("❌ Database error:", error);
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: "Gagal mengambil data dari database" 
+        },
+        { status: 500 }
+      );
+    }
+
+    console.log(`✅ Found ${sellers?.length || 0} pending sellers`);
     
+    // Log untuk debugging
+    if (sellers && sellers.length > 0) {
+      sellers.forEach(seller => {
+        console.log(`📝 ${seller.store_name}: verified=${seller.verified}, status=${seller.verification_status}, active=${seller.is_active}`);
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      message: "Data berhasil diambil",
-      data: dummyData
+      data: sellers || [],
+      count: sellers?.length || 0,
+      note: "Filter: verified=false OR verification_status=pending OR verification_status IS NULL"
     });
 
-  } catch (error) {
-    console.error("❌ [API ADMIN PENDING] Error:", error);
+  } catch (error: any) {
+    console.error("❌ System error:", error);
     return NextResponse.json(
       { 
         success: false, 
-        message: "Internal server error",
-        error: error instanceof Error ? error.message : "Unknown error"
+        message: "Terjadi kesalahan sistem" 
       },
       { status: 500 }
     );
