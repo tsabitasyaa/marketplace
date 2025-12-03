@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  const res = NextResponse.json({ message: "Logout success" });
+  try {
+    const response = NextResponse.json({
+      message: "Logout berhasil",
+      success: true
+    });
 
-  res.cookies.set("adminToken", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(0), // hapus cookie
-  });
+    // Hapus cookie adminToken
+    response.cookies.delete("adminToken");
+    
+    console.log("✅ Admin logged out");
+    return response;
 
-  return res;
+  } catch (error) {
+    console.error("❌ Logout error:", error);
+    return NextResponse.json(
+      { message: "Logout gagal" },
+      { status: 500 }
+    );
+  }
 }
