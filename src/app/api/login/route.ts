@@ -1,10 +1,6 @@
+// app/api/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,11 +13,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Langsung login dengan Supabase Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // Menggunakan ANON KEY untuk auth login, bukan service role
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    // Login Supabase Auth
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
     if (authError) {
       return NextResponse.json(
@@ -30,16 +33,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Cek role user di database
-    const { data: userData } = await supabaseAdmin
-      .from("users")
-      .select("role")
-      .eq("email", email)
-      .single();
+    const user = authData.user;
 
-    if (!userData || (userData.role !== "seller" && userData.role !== "penjual")) {
-      // Logout jika bukan penjual
-      await supabaseAdmin.auth.signOut();
+    // Ambil role dari metadata
+    const role = user.user_metadata?.role;
+
+    // Validasi: hanya seller yang boleh login
+    if (role !== "seller" && role !== "penjual") {
       return NextResponse.json(
         { error: "Hanya penjual yang dapat login" },
         { status: 403 }
@@ -49,13 +49,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       user: {
-        id: authData.user.id,
-        email: authData.user.email,
-        role: userData.role,
+        id: user.id,
+        email: user.email,
+        role,
+        seller_id: user.user_metadata?.seller_id,
       },
+      session: authData.session, // jika ingin simpan access token
     });
 
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json(
       { error: "Terjadi kesalahan internal" },
