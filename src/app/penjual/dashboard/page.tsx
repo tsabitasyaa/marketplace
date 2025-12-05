@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -35,14 +35,6 @@ interface CategoryData {
   category: string;
   count: number;
   percentage: number;
-  color: string;
-}
-
-interface ProvinceData {
-  province: string;
-  storeCount: number;
-  percentage: number;
-  color: string;
 }
 
 interface MonthlyVisitorData {
@@ -57,11 +49,10 @@ interface RatingDistribution {
   rating: number;
   count: number;
   percentage: number;
-  color: string;
 }
 
 type ActiveView = 'dashboard' | 'laporan' | 'kelola-produk' | 'tambah-produk' | 'edit-produk';
-type ReportType = 'stock-by-stock' | 'stock-by-rating' | 'low-stock' | 'best-seller';
+type ReportType = 'stock-by-stock' | 'stock-by-rating' | 'low-stock';
 
 export default function DashboardPenjual() {
   const router = useRouter();
@@ -96,6 +87,7 @@ export default function DashboardPenjual() {
   const [pdfData, setPdfData] = useState<Product[]>([]);
   const [pdfTitle, setPdfTitle] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
 
   // Dummy data generator
   const generateRandomSold = useCallback(() => Math.floor(Math.random() * 50) + 10, []);
@@ -104,7 +96,30 @@ export default function DashboardPenjual() {
   const generateRandomComments = useCallback(() => Math.floor(Math.random() * 60) + 20, []);
   const generateRandomSoldMonth = useCallback(() => Math.floor(Math.random() * 40) + 30, []);
 
-  const COLORS = ['#567C8D', '#2F4156', '#C8D9E6', '#94A9C9', '#6B8BA4', '#3A506B'];
+  // Define COLORS inside useMemo to prevent unnecessary re-renders
+  const COLORS = useMemo(() => ['#567C8D', '#2F4156', '#C8D9E6', '#94A9C9', '#6B8BA4', '#3A506B'], []);
+
+  // Dummy images array
+  const dummyImages = useMemo(() => [
+    "/images/products/shoes1.jpg",
+    "/images/products/shirt1.jpg", 
+    "/images/products/jeans1.jpg",
+    "/images/products/shoes2.jpg",
+    "/images/products/bag1.jpg",
+    "/images/products/watch1.jpg",
+    "/images/products/shirt2.jpg",
+    "/images/products/hat1.jpg",
+    "/images/products/wallet1.jpg",
+    "/images/products/shoes3.jpg",
+    "/images/products/tshirt1.jpg",
+    "/images/products/jacket1.jpg"
+  ], []);
+
+  // Function to get random dummy image
+  const getRandomDummyImage = useCallback(() => {
+    const randomIndex = Math.floor(Math.random() * dummyImages.length);
+    return dummyImages[randomIndex];
+  }, [dummyImages]);
 
   // Initialize mock products
   const getMockProducts = useCallback((): Product[] => {
@@ -117,7 +132,7 @@ export default function DashboardPenjual() {
         stock: 15,
         sold: 42,
         rating: 4.7,
-        image: "/product-image.png",
+        image: "/images/products/shoes1.jpg",
         createdAt: "2024-01-15"
       },
       {
@@ -128,7 +143,7 @@ export default function DashboardPenjual() {
         stock: 15,
         sold: 28,
         rating: 4.5,
-        image: "/product1.jpg",
+        image: "/images/products/shirt1.jpg",
         createdAt: "2024-01-20"
       },
       {
@@ -139,7 +154,7 @@ export default function DashboardPenjual() {
         stock: 3,
         sold: 15,
         rating: 4.2,
-        image: "/product2.jpg",
+        image: "/images/products/jeans1.jpg",
         createdAt: "2024-02-05"
       },
       {
@@ -150,7 +165,7 @@ export default function DashboardPenjual() {
         stock: 8,
         sold: 38,
         rating: 4.8,
-        image: "/product3.jpg",
+        image: "/images/products/shoes2.jpg",
         createdAt: "2024-02-10"
       },
       {
@@ -161,7 +176,7 @@ export default function DashboardPenjual() {
         stock: 1,
         sold: 12,
         rating: 4.0,
-        image: "/product4.jpg",
+        image: "/images/products/bag1.jpg",
         createdAt: "2024-02-15"
       },
       {
@@ -172,7 +187,7 @@ export default function DashboardPenjual() {
         stock: 12,
         sold: 25,
         rating: 4.7,
-        image: "/product5.jpg",
+        image: "/images/products/watch1.jpg",
         createdAt: "2024-03-01"
       },
       {
@@ -183,7 +198,7 @@ export default function DashboardPenjual() {
         stock: 6,
         sold: 18,
         rating: 4.3,
-        image: "/product6.jpg",
+        image: "/images/products/shirt2.jpg",
         createdAt: "2024-03-05"
       },
       {
@@ -194,7 +209,7 @@ export default function DashboardPenjual() {
         stock: 20,
         sold: 32,
         rating: 4.1,
-        image: "/product7.jpg",
+        image: "/images/products/hat1.jpg",
         createdAt: "2024-03-10"
       },
       {
@@ -205,7 +220,7 @@ export default function DashboardPenjual() {
         stock: 4,
         sold: 21,
         rating: 4.6,
-        image: "/product8.jpg",
+        image: "/images/products/wallet1.jpg",
         createdAt: "2024-03-15"
       },
       {
@@ -216,25 +231,62 @@ export default function DashboardPenjual() {
         stock: 7,
         sold: 35,
         rating: 4.9,
-        image: "/product9.jpg",
+        image: "/images/products/shoes3.jpg",
         createdAt: "2024-03-20"
       }
     ];
   }, []);
 
+  // Generate all months data (12 months)
+  const generateAllMonthsData = useCallback(() => {
+    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+    return months.map((month) => ({
+      month,
+      visitors: generateRandomVisitors(),
+      comments: generateRandomComments(),
+      ratings: Math.floor(generateRandomComments() * 0.7),
+      sold: generateRandomSoldMonth()
+    }));
+  }, [generateRandomVisitors, generateRandomComments, generateRandomSoldMonth]);
+
+  const getDisplayedMonths = useCallback(() => {
+    const allMonths = generateAllMonthsData();
+    return allMonths.slice(currentMonthIndex, currentMonthIndex + 6);
+  }, [currentMonthIndex, generateAllMonthsData]);
+
+  const handleNextMonths = () => {
+    setCurrentMonthIndex(prev => Math.min(prev + 3, 6));
+  };
+
+  const handlePrevMonths = () => {
+    setCurrentMonthIndex(prev => Math.max(prev - 3, 0));
+  };
+
   useEffect(() => {
-    const savedProducts = localStorage.getItem('dashboard_products');
-    if (savedProducts) {
-      setProducts(JSON.parse(savedProducts));
-    } else {
-      const mockProducts = getMockProducts();
-      const productsWithSold = mockProducts.map(product => ({
-        ...product,
-        sold: generateRandomSold(),
-        createdAt: new Date().toISOString()
-      }));
-      setProducts(productsWithSold);
-    }
+    const loadProducts = async () => {
+      try {
+        setIsLoading(true);
+        const savedProducts = localStorage.getItem('dashboard_products');
+        
+        if (savedProducts) {
+          setProducts(JSON.parse(savedProducts));
+        } else {
+          const mockProducts = getMockProducts();
+          const productsWithSold = mockProducts.map(product => ({
+            ...product,
+            sold: generateRandomSold(),
+            createdAt: new Date().toISOString()
+          }));
+          setProducts(productsWithSold);
+        }
+      } catch (error) {
+        console.error('Error loading products:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProducts();
   }, [getMockProducts, generateRandomSold]);
 
   useEffect(() => {
@@ -244,56 +296,48 @@ export default function DashboardPenjual() {
   }, [products]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
+    const fetchDashboardData = async () => {
+      if (products.length === 0) return;
+
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        setIsLoading(true);
         
-        const currentProducts = products.length > 0 ? products : getMockProducts();
-        
+        // Calculate category data
         const categoryCounts: Record<string, number> = {};
-        const categorySold: Record<string, number> = {};
-        
-        currentProducts.forEach(product => {
+        products.forEach(product => {
           categoryCounts[product.category] = (categoryCounts[product.category] || 0) + 1;
-          categorySold[product.category] = (categorySold[product.category] || 0) + product.sold;
         });
 
-        const totalProducts = currentProducts.length;
-        const mockCategories: CategoryData[] = Object.entries(categoryCounts).map(([category, count], index) => ({
+        const totalProducts = products.length;
+        const categoryData: CategoryData[] = Object.entries(categoryCounts).map(([category, count]) => ({
           category,
           count,
           percentage: parseFloat(((count / totalProducts) * 100).toFixed(1)),
-          color: COLORS[index % COLORS.length]
         }));
-        setCategories(mockCategories);
+        setCategories(categoryData);
 
-        const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-        const mockMonthlyVisitors: MonthlyVisitorData[] = months.slice(0, 6).map((month) => ({
-          month,
-          visitors: generateRandomVisitors(),
-          comments: generateRandomComments(),
-          ratings: Math.floor(generateRandomComments() * 0.7),
-          sold: generateRandomSoldMonth()
-        }));
-        setMonthlyVisitors(mockMonthlyVisitors);
+        // Generate monthly visitors data
+        const monthlyData = generateAllMonthsData();
+        setMonthlyVisitors(monthlyData);
         
+        // Set rating distribution
         const ratingData: RatingDistribution[] = [
-          { rating: 5, count: 45, percentage: 35, color: "#567C8D" },
-          { rating: 4, count: 60, percentage: 46, color: "#2F4156" },
-          { rating: 3, count: 15, percentage: 12, color: "#C8D9E6" },
-          { rating: 2, count: 8, percentage: 6, color: "#94A9C9" },
-          { rating: 1, count: 2, percentage: 1, color: "#6B8BA4" }
+          { rating: 5, count: 45, percentage: 35 },
+          { rating: 4, count: 60, percentage: 46 },
+          { rating: 3, count: 15, percentage: 12 },
+          { rating: 2, count: 8, percentage: 6 },
+          { rating: 1, count: 2, percentage: 1 }
         ];
         setRatingDistribution(ratingData);
         
-        const lowStockProducts = currentProducts.filter(product => product.stock < 2).length;
-        const averageRating = currentProducts.reduce((acc, product) => acc + product.rating, 0) / totalProducts;
-        const totalRevenue = currentProducts.reduce((acc, product) => acc + (product.price * product.sold), 0);
-        const totalSold = currentProducts.reduce((acc, product) => acc + product.sold, 0);
+        // Calculate statistics
+        const lowStockProducts = products.filter(product => product.stock < 2).length;
+        const averageRating = products.reduce((acc, product) => acc + product.rating, 0) / totalProducts;
+        const totalRevenue = products.reduce((acc, product) => acc + (product.price * product.sold), 0);
+        const totalSold = products.reduce((acc, product) => acc + product.sold, 0);
 
-        const totalVisitors = mockMonthlyVisitors.reduce((acc, month) => acc + month.visitors, 0);
-        const totalRatingComments = mockMonthlyVisitors.reduce((acc, month) => acc + month.comments, 0);
+        const totalVisitors = monthlyData.reduce((acc, month) => acc + month.visitors, 0);
+        const totalRatingComments = monthlyData.reduce((acc, month) => acc + month.comments, 0);
 
         setStats(prev => ({
           ...prev,
@@ -307,35 +351,37 @@ export default function DashboardPenjual() {
           visitorsWithComments: Math.floor(totalVisitors * 0.25)
         }));
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching dashboard data:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, [products, COLORS, getMockProducts, generateRandomVisitors, generateRandomComments, generateRandomSoldMonth]);
+    fetchDashboardData();
+  }, [products, generateAllMonthsData]);
 
   const generateReport = () => {
     let dataToExport: Product[] = [];
     let title = "";
+    let reportId = "";
     
     switch (selectedReport) {
       case 'stock-by-stock':
         dataToExport = [...products].sort((a, b) => b.stock - a.stock);
-        title = "Laporan Stok Produk (Berdasarkan Stok)";
+        title = "Laporan Daftar Produk Berdasarkan Stock";
+        reportId = "SRS-MartPlace-12";
         break;
       case 'stock-by-rating':
         dataToExport = [...products].sort((a, b) => b.rating - a.rating);
-        title = "Laporan Rating Produk (Berdasarkan Rating)";
+        title = "Laporan Daftar Produk Berdasarkan Rating";
+        reportId = "SRS-MartPlace-13";
         break;
       case 'low-stock':
-        dataToExport = products.filter(product => product.stock < 2);
-        title = "Laporan Stok Rendah";
-        break;
-      case 'best-seller':
-        dataToExport = [...products].sort((a, b) => b.sold - a.sold);
-        title = "Laporan Produk Terlaris";
+        dataToExport = [...products]
+          .filter(product => product.stock < 2)
+          .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+        title = "Laporan Daftar Produk Segera Dipesan";
+        reportId = "SRS-MartPlace-14";
         break;
     }
     
@@ -355,10 +401,9 @@ export default function DashboardPenjual() {
       year: 'numeric'
     });
 
-    const totalSoldInReport = pdfData.reduce((acc, product) => acc + product.sold, 0);
-    const totalRevenueInReport = pdfData.reduce((acc, product) => acc + (product.price * product.sold), 0);
+    const currentUser = "Penjual Toko Fashion XYZ";
 
-    const htmlContent = `
+    let htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -370,20 +415,28 @@ export default function DashboardPenjual() {
             color: #333;
           }
           .header {
-            text-align: center;
             margin-bottom: 30px;
-            border-bottom: 2px solid #567C8D;
             padding-bottom: 20px;
+            border-bottom: 2px solid #567C8D;
+          }
+          .report-id {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 5px;
           }
           .title {
             color: #283593;
             font-size: 24px;
-            margin: 0;
+            margin: 0 0 5px 0;
           }
           .subtitle {
             color: #666;
             font-size: 14px;
             margin-top: 5px;
+          }
+          .date-info {
+            margin-top: 10px;
+            font-size: 14px;
           }
           table {
             width: 100%;
@@ -396,6 +449,7 @@ export default function DashboardPenjual() {
             padding: 10px;
             text-align: left;
             font-weight: bold;
+            border: 1px solid #ddd;
           }
           td {
             padding: 8px 10px;
@@ -404,51 +458,13 @@ export default function DashboardPenjual() {
           tr:nth-child(even) {
             background-color: #f9f9f9;
           }
-          .status-low {
-            background-color: #ffebee;
-            color: #c62828;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-          }
-          .status-medium {
-            background-color: #fff3e0;
-            color: #ef6c00;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-          }
-          .status-good {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-          }
-          .stats {
-            margin-top: 30px;
-            padding: 15px;
+          .footer-note {
+            margin-top: 20px;
+            padding: 10px;
             background-color: #f5f5f5;
             border-radius: 5px;
-          }
-          .stats-title {
-            color: #283593;
-            font-weight: bold;
-            margin-bottom: 10px;
-          }
-          .summary-box {
-            background-color: #e3f2fd;
-            border-left: 4px solid #567C8D;
-            padding: 15px;
-            margin-top: 20px;
-            border-radius: 4px;
-          }
-          .center-text {
-            text-align: center;
-          }
-          .green-bold {
-            color: #2e7d32;
-            font-weight: bold;
+            font-style: italic;
+            font-size: 12px;
           }
           .no-print {
             display: block;
@@ -485,30 +501,27 @@ export default function DashboardPenjual() {
       </head>
       <body>
         <div class="header">
+          <div class="report-id">${pdfTitle === "Laporan Daftar Produk Berdasarkan Stock" ? "(SRS-MartPlace-12)" : 
+                           pdfTitle === "Laporan Daftar Produk Berdasarkan Rating" ? "(SRS-MartPlace-13)" : 
+                           "(SRS-MartPlace-14)"}</div>
           <h1 class="title">${pdfTitle}</h1>
-          <p class="subtitle">Dibuat pada: ${dateStr}</p>
+          <div class="date-info">
+            <p>Tanggal dibuat: ${dateStr} oleh <strong>${currentUser}</strong></p>
+          </div>
         </div>
-        
-        <div class="summary-box">
-          <p><strong>Ringkasan Laporan:</strong></p>
-          <p>Total Produk: ${pdfData.length}</p>
-          <p>Total Terjual: ${totalSoldInReport} unit</p>
-          <p>Total Pendapatan: ${formatCurrency(totalRevenueInReport)}</p>
-          ${selectedReport === 'best-seller' ? 
-            `<p>Produk Terlaris: ${pdfData[0]?.name || '-'} (${pdfData[0]?.sold || 0} unit)</p>` : ''}
-        </div>
-        
+    `;
+
+    if (selectedReport === 'stock-by-stock') {
+      htmlContent += `
         <table>
           <thead>
             <tr>
               <th>No</th>
-              <th>Nama Produk</th>
+              <th>Produk</th>
               <th>Kategori</th>
               <th>Harga</th>
-              <th class="center-text">Stok</th>
-              <th class="center-text">Terjual</th>
-              <th class="center-text">Rating</th>
-              <th>Status</th>
+              <th>Rating</th>
+              <th>Stock</th>
             </tr>
           </thead>
           <tbody>
@@ -518,36 +531,71 @@ export default function DashboardPenjual() {
                 <td>${product.name}</td>
                 <td>${product.category}</td>
                 <td>${formatCurrency(product.price)}</td>
-                <td class="center-text">${product.stock}</td>
-                <td class="center-text green-bold">${product.sold}</td>
-                <td class="center-text">${product.rating}</td>
-                <td>
-                  <span class="${
-                    product.stock < 2 
-                      ? 'status-low' 
-                      : product.stock < 5 
-                        ? 'status-medium'
-                        : 'status-good'
-                  }">
-                    ${product.stock < 2 ? 'Stok Rendah' : product.stock < 5 ? 'Stok Menipis' : 'Tersedia'}
-                  </span>
-                </td>
+                <td>${product.rating}</td>
+                <td>${product.stock}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
-        
-        <div class="stats">
-          <div class="stats-title">Statistik:</div>
-          <p>Total Produk: ${pdfData.length}</p>
-          <p>Total Terjual: ${totalSoldInReport} unit</p>
-          <p>Total Pendapatan: ${formatCurrency(totalRevenueInReport)}</p>
-          <p>Rata-rata Rating: ${(pdfData.reduce((acc, product) => acc + product.rating, 0) / pdfData.length).toFixed(1)}</p>
-          ${selectedReport === 'low-stock' ? 
-            `<p>Produk Stok Rendah: ${pdfData.filter(p => p.stock < 2).length}</p>` : 
-            ''}
-        </div>
-        
+        <div class="footer-note">*) urutkan berdasarkan stock</div>
+      `;
+    } else if (selectedReport === 'stock-by-rating') {
+      htmlContent += `
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Produk</th>
+              <th>Kategori</th>
+              <th>Harga</th>
+              <th>Stock</th>
+              <th>Rating</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pdfData.map((product, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${product.name}</td>
+                <td>${product.category}</td>
+                <td>${formatCurrency(product.price)}</td>
+                <td>${product.stock}</td>
+                <td>${product.rating}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer-note">*) urutkan berdasarkan rating</div>
+      `;
+    } else if (selectedReport === 'low-stock') {
+      htmlContent += `
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Produk</th>
+              <th>Kategori</th>
+              <th>Harga</th>
+              <th>Stock</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pdfData.map((product, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${product.name}</td>
+                <td>${product.category}</td>
+                <td>${formatCurrency(product.price)}</td>
+                <td>${product.stock}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer-note">*) urutkan berdasarkan kategori dan produk</div>
+      `;
+    }
+
+    htmlContent += `
         <div class="no-print" style="margin-top: 30px; text-align: center; padding: 20px;">
           <button onclick="window.print()" class="print-button">
             🖨️ Cetak Laporan
@@ -648,7 +696,7 @@ export default function DashboardPenjual() {
       stock: Number(newProduct.stock),
       sold: 0,
       rating: generateRandomRating(),
-      image: newProduct.image || "/product-default.jpg",
+      image: newProduct.image || getRandomDummyImage(),
       createdAt: new Date().toISOString()
     };
 
@@ -681,7 +729,8 @@ export default function DashboardPenjual() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('dashboard_products');
+    // Hanya hapus session/login info, TIDAK hapus data produk
+    // localStorage.removeItem('dashboard_products'); // JANGAN hapus ini
     router.push('/penjual/login');
   };
 
@@ -691,6 +740,7 @@ export default function DashboardPenjual() {
         <div className="p-6">
           <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-4">Konfirmasi Logout</h3>
           <p className="text-[var(--color-teal)] mb-6">Apakah Anda yakin ingin logout dari dashboard penjual?</p>
+          <p className="text-sm text-gray-600 mb-4">Catatan: Data produk Anda akan tetap tersimpan.</p>
           <div className="flex justify-end space-x-3">
             <button
               onClick={() => setShowLogoutConfirm(false)}
@@ -710,153 +760,174 @@ export default function DashboardPenjual() {
     </div>
   );
 
-  const renderDashboard = () => (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-[var(--color-teal)]">Total Produk</p>
-              <p className="text-2xl font-semibold text-[var(--color-navy)]">{stats.totalProducts}</p>
-              <p className="text-xs text-[var(--color-teal)] mt-1">
-                {categories.length} kategori aktif
-              </p>
-            </div>
-            <div className="rounded-full bg-[var(--color-sky-blue)] p-3">
-              <svg className="w-6 h-6 text-[var(--color-teal)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-[var(--color-teal)]">Total Terjual</p>
-              <p className="text-2xl font-semibold text-[var(--color-navy)]">{formatNumber(stats.totalSold)}</p>
-              <p className="text-xs text-[var(--color-teal)] mt-1">
-                {formatCurrency(stats.totalRevenue)} revenue
-              </p>
-            </div>
-            <div className="rounded-full bg-green-100 p-3">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-[var(--color-teal)]">Pengunjung & Rating</p>
-              <p className="text-2xl font-semibold text-[var(--color-navy)]">{formatNumber(stats.totalVisitors)}</p>
-              <p className="text-xs text-[var(--color-teal)] mt-1">
-                {stats.visitorsWithComments} memberikan komentar
-              </p>
-            </div>
-            <div className="rounded-full bg-purple-100 p-3">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-[var(--color-teal)]">Rating & Komentar</p>
-              <p className="text-2xl font-semibold text-[var(--color-navy)]">{formatNumber(stats.ratingComments)}</p>
-              <p className="text-xs text-[var(--color-teal)] mt-1">
-                Rata-rata rating: {stats.averageRating}/5
-              </p>
-            </div>
-            <div className="rounded-full bg-yellow-100 p-3">
-              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.364-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6">
-          <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-4">Sebaran Jumlah Produk Berdasarkan Kategori</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={categories}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#C8D9E6" />
-                <XAxis dataKey="category" stroke="#2F4156" fontSize={12} />
-                <YAxis stroke="#2F4156" fontSize={12} />
-                <Tooltip 
-                  formatter={(value) => [`${value} produk`, "Jumlah"]}
-                  labelFormatter={(label) => `Kategori: ${label}`}
-                  contentStyle={{ 
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #C8D9E6',
-                    borderRadius: '8px'
-                  }}
-                />
-                <Bar dataKey="count" name="Jumlah Produk" radius={[4, 4, 0, 0]}>
-                  {categories.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {categories.map((category, index) => (
-              <div key={index} className="flex items-center">
-                <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: category.color }} />
-                <span className="text-sm text-[var(--color-navy)]">
-                  {category.category}: {category.count} produk ({category.percentage}%)
-                </span>
+  const renderDashboard = () => {
+    const displayedMonths = getDisplayedMonths();
+    
+    return (
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[var(--color-teal)]">Total Produk</p>
+                <p className="text-2xl font-semibold text-[var(--color-navy)]">{stats.totalProducts}</p>
+                <p className="text-xs text-[var(--color-teal)] mt-1">
+                  {categories.length} kategori aktif
+                </p>
               </div>
-            ))}
+              <div className="rounded-full bg-[var(--color-sky-blue)] p-3">
+                <svg className="w-6 h-6 text-[var(--color-teal)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[var(--color-teal)]">Total Terjual</p>
+                <p className="text-2xl font-semibold text-[var(--color-navy)]">{formatNumber(stats.totalSold)}</p>
+                <p className="text-xs text-[var(--color-teal)] mt-1">
+                  {formatCurrency(stats.totalRevenue)} revenue
+                </p>
+              </div>
+              <div className="rounded-full bg-green-100 p-3">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[var(--color-teal)]">Pengunjung & Rating</p>
+                <p className="text-2xl font-semibold text-[var(--color-navy)]">{formatNumber(stats.totalVisitors)}</p>
+                <p className="text-xs text-[var(--color-teal)] mt-1">
+                  {stats.visitorsWithComments} memberikan komentar
+                </p>
+              </div>
+              <div className="rounded-full bg-purple-100 p-3">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[var(--color-teal)]">Rating & Komentar</p>
+                <p className="text-2xl font-semibold text-[var(--color-navy)]">{formatNumber(stats.ratingComments)}</p>
+                <p className="text-xs text-[var(--color-teal)] mt-1">
+                  Rata-rata rating: {stats.averageRating}/5
+                </p>
+              </div>
+              <div className="rounded-full bg-yellow-100 p-3">
+                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.364-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6">
+            <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-4">Sebaran Jumlah Produk Berdasarkan Kategori</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={categories}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#C8D9E6" />
+                  <XAxis dataKey="category" stroke="#2F4156" fontSize={12} />
+                  <YAxis stroke="#2F4156" fontSize={12} />
+                  <Tooltip 
+                    formatter={(value) => [`${value} produk`, "Jumlah"]}
+                    labelFormatter={(label) => `Kategori: ${label}`}
+                    contentStyle={{ 
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #C8D9E6',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Bar dataKey="count" name="Jumlah Produk" radius={[4, 4, 0, 0]} fill="#567C8D" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {categories.map((category, index) => (
+                <div key={index} className="flex items-center">
+                  <div className={`w-3 h-3 rounded-full mr-2 ${index % 2 === 0 ? 'bg-[#567C8D]' : 'bg-[#2F4156]'}`} />
+                  <span className="text-sm text-[var(--color-navy)]">
+                    {category.category}: {category.count} produk ({category.percentage}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6">
+            <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-4">Distribusi Rating Pengunjung</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ratingDistribution}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#C8D9E6" />
+                  <XAxis dataKey="rating" stroke="#2F4156" fontSize={12} />
+                  <YAxis stroke="#2F4156" fontSize={12} />
+                  <Tooltip 
+                    formatter={(value, name) => [`${value} rating`, name]}
+                    labelFormatter={(label) => `Rating: ${label} bintang`}
+                    contentStyle={{ 
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #C8D9E6',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Bar dataKey="count" name="Jumlah Rating" radius={[4, 4, 0, 0]} fill="#2F4156" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 text-sm text-[var(--color-navy)]">
+              Total {ratingDistribution.reduce((acc, item) => acc + item.count, 0)} rating diberikan oleh pengunjung
+            </div>
           </div>
         </div>
 
         <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6">
-          <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-4">Distribusi Rating Pengunjung</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-[var(--color-navy)]">Trend Pengunjung, Komentar & Penjualan</h3>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handlePrevMonths}
+                disabled={currentMonthIndex === 0}
+                className="p-2 rounded-lg bg-[var(--color-sky-blue)] text-[var(--color-navy)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-teal)] hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+                aria-label="Bulan sebelumnya"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-sm text-[var(--color-navy)]">
+                Bulan {displayedMonths[0]?.month} - {displayedMonths[displayedMonths.length - 1]?.month}
+              </span>
+              <button
+                onClick={handleNextMonths}
+                disabled={currentMonthIndex >= 6}
+                className="p-2 rounded-lg bg-[var(--color-sky-blue)] text-[var(--color-navy)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-teal)] hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+                aria-label="Bulan berikutnya"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ratingDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#C8D9E6" />
-                <XAxis dataKey="rating" stroke="#2F4156" fontSize={12} />
-                <YAxis stroke="#2F4156" fontSize={12} />
-                <Tooltip 
-                  formatter={(value, name) => [`${value} rating`, name]}
-                  labelFormatter={(label) => `Rating: ${label} bintang`}
-                  contentStyle={{ 
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #C8D9E6',
-                    borderRadius: '8px'
-                  }}
-                />
-                <Bar dataKey="count" name="Jumlah Rating" radius={[4, 4, 0, 0]}>
-                  {ratingDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-4 text-sm text-[var(--color-navy)]">
-            Total {ratingDistribution.reduce((acc, item) => acc + item.count, 0)} rating diberikan oleh pengunjung
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6">
-          <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-4">Trend Pengunjung, Komentar & Penjualan (6 Bulan)</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyVisitors}>
+              <AreaChart data={displayedMonths}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#C8D9E6" />
                 <XAxis dataKey="month" stroke="#2F4156" fontSize={12} />
                 <YAxis stroke="#2F4156" fontSize={12} />
@@ -897,9 +968,9 @@ export default function DashboardPenjual() {
             </ResponsiveContainer>
           </div>
           <div className="mt-4 text-sm text-[var(--color-navy)]">
-            <p>Rata-rata bulanan: {Math.round(monthlyVisitors.reduce((acc, month) => acc + month.visitors, 0) / monthlyVisitors.length)} pengunjung, 
-            {Math.round(monthlyVisitors.reduce((acc, month) => acc + month.comments, 0) / monthlyVisitors.length)} komentar,
-            {Math.round(monthlyVisitors.reduce((acc, month) => acc + month.sold, 0) / monthlyVisitors.length)} produk terjual</p>
+            <p>Rata-rata: {Math.round(displayedMonths.reduce((acc, month) => acc + month.visitors, 0) / displayedMonths.length)} pengunjung, 
+            {Math.round(displayedMonths.reduce((acc, month) => acc + month.comments, 0) / displayedMonths.length)} komentar,
+            {Math.round(displayedMonths.reduce((acc, month) => acc + month.sold, 0) / displayedMonths.length)} produk terjual</p>
           </div>
         </div>
 
@@ -957,15 +1028,15 @@ export default function DashboardPenjual() {
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderLaporan = () => (
     <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-[var(--color-navy)]">Laporan Produk</h2>
-          <p className="text-[var(--color-teal)]">Generate laporan produk dalam format PDF</p>
+          <p className="text-[var(--color-teal)]">Generate laporan produk sesuai SRS MartPlace</p>
         </div>
         
         <div className="flex items-center space-x-4">
@@ -977,10 +1048,9 @@ export default function DashboardPenjual() {
             className="border border-[var(--color-sky-blue)] rounded-lg px-4 py-2 text-[var(--color-navy)] focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
             aria-label="Pilih jenis laporan"
           >
-            <option value="stock-by-stock">Laporan Stok (Berdasarkan Stok)</option>
-            <option value="stock-by-rating">Laporan Rating (Berdasarkan Rating)</option>
-            <option value="low-stock">Laporan Stok Rendah</option>
-            <option value="best-seller">Laporan Produk Terlaris</option>
+            <option value="stock-by-stock">Laporan Daftar Produk Berdasarkan Stock</option>
+            <option value="stock-by-rating">Laporan Daftar Produk Berdasarkan Rating</option>
+            <option value="low-stock">Laporan Daftar Produk Segera Dipesan</option>
           </select>
 
           <button
@@ -1000,14 +1070,24 @@ export default function DashboardPenjual() {
         <table className="w-full">
           <thead>
             <tr className="bg-[var(--color-beige)]">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">No</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Gambar</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Produk</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Kategori</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Harga</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Stok</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Terjual</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Rating</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Status</th>
+              {selectedReport === 'stock-by-stock' && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Rating</th>
+              )}
+              {selectedReport === 'stock-by-rating' && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Stock</th>
+              )}
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">
+                {selectedReport === 'stock-by-stock' ? 'Stock' : 
+                 selectedReport === 'stock-by-rating' ? 'Rating' : 'Stock'}
+              </th>
+              {selectedReport === 'low-stock' && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Status</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--color-sky-blue)]">
@@ -1021,59 +1101,68 @@ export default function DashboardPenjual() {
                   dataToShow = [...products].sort((a, b) => b.rating - a.rating);
                   break;
                 case 'low-stock':
-                  dataToShow = products.filter(product => product.stock < 2);
-                  break;
-                case 'best-seller':
-                  dataToShow = [...products].sort((a, b) => b.sold - a.sold);
+                  dataToShow = [...products]
+                    .filter(product => product.stock < 2)
+                    .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
                   break;
                 default:
                   dataToShow = products;
               }
 
-              return dataToShow.map((product) => (
+              return dataToShow.map((product, index) => (
                 <tr key={product.id} className="hover:bg-[var(--color-beige)]">
+                  <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{index + 1}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="w-16 h-16 bg-[var(--color-sky-blue)] rounded-lg overflow-hidden">
-                      <Image 
-                        src={product.image} 
-                        alt={product.name}
-                        width={64}
-                        height={64}
-                        className="w-full h-full object-cover"
-                        onError={() => {
-                          // Handle image error
-                        }}
-                      />
+                    <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden">
+                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-300 flex items-center justify-center text-blue-800 text-xs">
+                        <div className="text-center">
+                          <div className="text-lg">📷</div>
+                          <div className="text-[10px] mt-1">Image</div>
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.category}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{formatCurrency(product.price)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.stock}</td>
+                  {selectedReport === 'stock-by-stock' && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        <span className="text-[var(--color-navy)]">{product.rating}</span>
+                      </div>
+                    </td>
+                  )}
+                  {selectedReport === 'stock-by-rating' && (
+                    <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.stock}</td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">
-                      {product.sold} unit
-                    </span>
+                    {selectedReport === 'stock-by-stock' ? (
+                      <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {product.stock}
+                      </span>
+                    ) : selectedReport === 'stock-by-rating' ? (
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        <span className="text-[var(--color-navy)] font-medium">{product.rating}</span>
+                      </div>
+                    ) : (
+                      <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {product.stock}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                      <span className="text-[var(--color-navy)]">{product.rating}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      product.stock < 2 
-                        ? 'bg-red-100 text-red-800' 
-                        : product.stock < 5 
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-green-100 text-green-800'
-                    }`}>
-                      {product.stock < 2 ? 'Stok Rendah' : product.stock < 5 ? 'Stok Menipis' : 'Tersedia'}
-                    </span>
-                  </td>
+                  {selectedReport === 'low-stock' && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                        Stok Rendah
+                      </span>
+                    </td>
+                  )}
                 </tr>
               ));
             })()}
@@ -1082,22 +1171,39 @@ export default function DashboardPenjual() {
       </div>
       
       <div className="mt-6 p-4 bg-[var(--color-beige)] rounded-lg">
-        <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-3">Ringkasan Statistik</h3>
+        <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-3">Ringkasan Laporan</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-[var(--color-white)] p-4 rounded-lg shadow-sm">
-            <p className="text-sm text-[var(--color-teal)]">Total Produk</p>
-            <p className="text-2xl font-bold text-[var(--color-navy)]">{products.length}</p>
-          </div>
-          <div className="bg-[var(--color-white)] p-4 rounded-lg shadow-sm">
-            <p className="text-sm text-[var(--color-teal)]">Total Terjual</p>
-            <p className="text-2xl font-bold text-[var(--color-navy)]">
-              {formatNumber(products.reduce((acc, product) => acc + product.sold, 0))} unit
+            <p className="text-sm text-[var(--color-teal)]">Jenis Laporan</p>
+            <p className="text-lg font-bold text-[var(--color-navy)]">
+              {selectedReport === 'stock-by-stock' && 'Laporan Daftar Produk Berdasarkan Stock'}
+              {selectedReport === 'stock-by-rating' && 'Laporan Daftar Produk Berdasarkan Rating'}
+              {selectedReport === 'low-stock' && 'Laporan Daftar Produk Segera Dipesan'}
+            </p>
+            <p className="text-xs text-[var(--color-teal)] mt-1">
+              {selectedReport === 'stock-by-stock' && '(SRS-MartPlace-12)'}
+              {selectedReport === 'stock-by-rating' && '(SRS-MartPlace-13)'}
+              {selectedReport === 'low-stock' && '(SRS-MartPlace-14)'}
             </p>
           </div>
           <div className="bg-[var(--color-white)] p-4 rounded-lg shadow-sm">
-            <p className="text-sm text-[var(--color-teal)]">Total Pendapatan</p>
+            <p className="text-sm text-[var(--color-teal)]">Jumlah Produk</p>
             <p className="text-2xl font-bold text-[var(--color-navy)]">
-              {formatCurrency(products.reduce((acc, product) => acc + (product.price * product.sold), 0))}
+              {(() => {
+                switch (selectedReport) {
+                  case 'stock-by-stock': return products.length;
+                  case 'stock-by-rating': return products.length;
+                  case 'low-stock': return products.filter(p => p.stock < 2).length;
+                  default: return products.length;
+                }
+              })()}
+            </p>
+          </div>
+          <div className="bg-[var(--color-white)] p-4 rounded-lg shadow-sm">
+            <p className="text-sm text-[var(--color-teal)]">Format</p>
+            <p className="text-lg font-bold text-[var(--color-navy)]">PDF Document</p>
+            <p className="text-xs text-[var(--color-teal)] mt-1">
+              Siap untuk dicetak
             </p>
           </div>
         </div>
@@ -1110,7 +1216,7 @@ export default function DashboardPenjual() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-[var(--color-navy)]">Kelola Produk</h2>
-          <p className="text-[var(--color-teal)]">Kelola produk yang Anda jual</p>
+          <p className="text-[var(--color-teal)]">Kelola produk yang Anda jual. Data akan tetap tersimpan meskipun logout.</p>
           <p className="text-sm text-[var(--color-teal)] mt-1">
             Produk baru akan memiliki rating acak 3.0-5.0
           </p>
@@ -1146,17 +1252,13 @@ export default function DashboardPenjual() {
             {products.map((product) => (
               <tr key={product.id} className="hover:bg-[var(--color-beige)]">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="w-16 h-16 bg-[var(--color-sky-blue)] rounded-lg overflow-hidden">
-                    <Image 
-                      src={product.image} 
-                      alt={product.name}
-                      width={64}
-                      height={64}
-                      className="w-full h-full object-cover"
-                      onError={() => {
-                        // Handle image error
-                      }}
-                    />
+                  <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden">
+                    <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-300 flex items-center justify-center text-blue-800">
+                      <div className="text-center">
+                        <div className="text-lg">📷</div>
+                        <div className="text-[10px] mt-1">Image</div>
+                      </div>
+                    </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)] font-medium">
@@ -1211,7 +1313,7 @@ export default function DashboardPenjual() {
                     aria-label={`Hapus produk ${product.name}`}
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 011.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                     Hapus
                   </button>
@@ -1269,13 +1371,12 @@ export default function DashboardPenjual() {
               aria-label="Upload gambar produk"
             >
               {imagePreview ? (
-                <Image 
-                  src={imagePreview} 
-                  alt="Preview" 
-                  width={128}
-                  height={128}
-                  className="w-full h-full object-cover rounded-lg"
-                />
+                <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-2xl">📷</div>
+                    <div className="text-xs mt-2">Preview Image</div>
+                  </div>
+                </div>
               ) : (
                 <>
                   <svg className="w-8 h-8 text-[var(--color-sky-blue)] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1285,7 +1386,7 @@ export default function DashboardPenjual() {
                 </>
               )}
             </button>
-            <div className="flex-1">
+            <div>
               <p className="text-sm text-[var(--color-navy)] mb-2">Format yang didukung: JPG, PNG, GIF</p>
               <p className="text-xs text-[var(--color-teal)]">Maksimal ukuran: 5MB</p>
             </div>
@@ -1300,43 +1401,43 @@ export default function DashboardPenjual() {
           />
         </div>
 
-        <div>
-          <label htmlFor="product-name" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
-            Nama Produk <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="product-name"
-            type="text"
-            value={newProduct.name}
-            onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
-            className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
-            placeholder="Masukkan nama produk"
-            required
-          />
-        </div>
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label htmlFor="product-name" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
+              Nama Produk <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="product-name"
+              type="text"
+              value={newProduct.name}
+              onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+              className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+              placeholder="Masukkan nama produk"
+              required
+            />
+          </div>
 
-        <div>
-          <label htmlFor="product-category" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
-            Kategori <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="product-category"
-            value={newProduct.category}
-            onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
-            className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
-            required
-            aria-label="Pilih kategori produk"
-          >
-            <option value="">Pilih Kategori</option>
-            <option value="Pakaian">Pakaian</option>
-            <option value="Sepatu">Sepatu</option>
-            <option value="Aksesoris">Aksesoris</option>
-            <option value="Elektronik">Elektronik</option>
-            <option value="Makanan">Makanan</option>
-          </select>
-        </div>
+          <div>
+            <label htmlFor="product-category" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
+              Kategori <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="product-category"
+              value={newProduct.category}
+              onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+              className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+              required
+              aria-label="Pilih kategori produk"
+            >
+              <option value="">Pilih Kategori</option>
+              <option value="Pakaian">Pakaian</option>
+              <option value="Sepatu">Sepatu</option>
+              <option value="Aksesoris">Aksesoris</option>
+              <option value="Elektronik">Elektronik</option>
+              <option value="Makanan">Makanan</option>
+            </select>
+          </div>
 
-        <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="product-price" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
               Harga <span className="text-red-500">*</span>
@@ -1410,15 +1511,14 @@ export default function DashboardPenjual() {
                 onClick={() => document.getElementById('edit-image-upload')?.click()}
                 aria-label="Ganti gambar produk"
               >
-                <Image 
-                  src={editingProduct.image} 
-                  alt="Preview" 
-                  width={128}
-                  height={128}
-                  className="w-full h-full object-cover rounded-lg"
-                />
+                <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-2xl">📷</div>
+                    <div className="text-xs mt-2">Product Image</div>
+                  </div>
+                </div>
               </button>
-              <div className="flex-1">
+              <div>
                 <p className="text-sm text-[var(--color-navy)] mb-2">Klik untuk mengganti gambar</p>
                 <p className="text-xs text-[var(--color-teal)]">Format: JPG, PNG, GIF (max 5MB)</p>
               </div>
@@ -1433,39 +1533,39 @@ export default function DashboardPenjual() {
             />
           </div>
 
-          <div>
-            <label htmlFor="edit-product-name" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
-              Nama Produk
-            </label>
-            <input
-              id="edit-product-name"
-              type="text"
-              value={editingProduct.name}
-              onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
-              className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
-            />
-          </div>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label htmlFor="edit-product-name" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
+                Nama Produk
+              </label>
+              <input
+                id="edit-product-name"
+                type="text"
+                value={editingProduct.name}
+                onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
+                className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+              />
+            </div>
 
-          <div>
-            <label htmlFor="edit-product-category" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
-              Kategori
-            </label>
-            <select
-              id="edit-product-category"
-              value={editingProduct.category}
-              onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
-              className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
-              aria-label="Pilih kategori produk"
-            >
-              <option value="Pakaian">Pakaian</option>
-              <option value="Sepatu">Sepatu</option>
-              <option value="Aksesoris">Aksesoris</option>
-              <option value="Elektronik">Elektronik</option>
-              <option value="Makanan">Makanan</option>
-            </select>
-          </div>
+            <div>
+              <label htmlFor="edit-product-category" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
+                Kategori
+              </label>
+              <select
+                id="edit-product-category"
+                value={editingProduct.category}
+                onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
+                className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+                aria-label="Pilih kategori produk"
+              >
+                <option value="Pakaian">Pakaian</option>
+                <option value="Sepatu">Sepatu</option>
+                <option value="Aksesoris">Aksesoris</option>
+                <option value="Elektronik">Elektronik</option>
+                <option value="Makanan">Makanan</option>
+              </select>
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="edit-product-price" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
                 Harga
@@ -1535,51 +1635,59 @@ export default function DashboardPenjual() {
         
         <div className="flex-1 overflow-auto p-6">
           <div className="bg-white border border-gray-300 rounded-lg p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-center text-[var(--color-navy)] mb-2">{pdfTitle}</h3>
-            <p className="text-sm text-[var(--color-teal)] text-center mb-6">
-              Dibuat pada: {new Date().toLocaleDateString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
-              })}
-            </p>
+            <div className="text-center mb-6">
+              <div className="text-sm text-gray-600 mb-1">
+                {pdfTitle === "Laporan Daftar Produk Berdasarkan Stock" && "(SRS-MartPlace-12)"}
+                {pdfTitle === "Laporan Daftar Produk Berdasarkan Rating" && "(SRS-MartPlace-13)"}
+                {pdfTitle === "Laporan Daftar Produk Segera Dipesan" && "(SRS-MartPlace-14)"}
+              </div>
+              <h3 className="text-lg font-bold text-[var(--color-navy)] mb-2">{pdfTitle}</h3>
+              <p className="text-sm text-gray-600">
+                Tanggal dibuat: {new Date().toLocaleDateString('id-ID', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                })} oleh <strong>Penjual Toko Fashion XYZ</strong>
+              </p>
+            </div>
             
             <div className="overflow-x-auto">
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr className="bg-[var(--color-teal)] text-white">
                     <th className="border border-gray-300 p-2 text-left text-sm font-medium">No</th>
-                    <th className="border border-gray-300 p-2 text-left text-sm font-medium">Nama Produk</th>
+                    <th className="border border-gray-300 p-2 text-left text-sm font-medium">Produk</th>
                     <th className="border border-gray-300 p-2 text-left text-sm font-medium">Kategori</th>
                     <th className="border border-gray-300 p-2 text-left text-sm font-medium">Harga</th>
-                    <th className="border border-gray-300 p-2 text-left text-sm font-medium">Stok</th>
-                    <th className="border border-gray-300 p-2 text-left text-sm font-medium">Terjual</th>
-                    <th className="border border-gray-300 p-2 text-left text-sm font-medium">Rating</th>
-                    <th className="border border-gray-300 p-2 text-left text-sm font-medium">Status</th>
+                    {selectedReport === 'stock-by-stock' && (
+                      <th className="border border-gray-300 p-2 text-left text-sm font-medium">Rating</th>
+                    )}
+                    {selectedReport === 'stock-by-rating' && (
+                      <th className="border border-gray-300 p-2 text-left text-sm font-medium">Stock</th>
+                    )}
+                    <th className="border border-gray-300 p-2 text-left text-sm font-medium">
+                      {selectedReport === 'stock-by-stock' ? 'Stock' : 
+                       selectedReport === 'stock-by-rating' ? 'Rating' : 'Stock'}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {pdfData.map((product, index) => (
-                    <tr key={product.id} className={index % 2 === 0 ? 'bg-[var(--color-beige)]' : 'bg-white'}>
-                      <td className="border border-gray-300 p-2 text-sm">{index + 1}</td>
+                    <tr key={product.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                      <td className="border border-gray-300 p-2 text-sm text-center">{index + 1}</td>
                       <td className="border border-gray-300 p-2 text-sm">{product.name}</td>
                       <td className="border border-gray-300 p-2 text-sm">{product.category}</td>
                       <td className="border border-gray-300 p-2 text-sm">{formatCurrency(product.price)}</td>
-                      <td className="border border-gray-300 p-2 text-sm text-center">{product.stock}</td>
-                      <td className="border border-gray-300 p-2 text-sm text-center green-bold">
-                        {product.sold}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-sm text-center">{product.rating}</td>
-                      <td className="border border-gray-300 p-2 text-sm">
-                        <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                          product.stock < 2 
-                            ? 'bg-red-100 text-red-800' 
-                            : product.stock < 5 
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-green-100 text-green-800'
-                        }`}>
-                          {product.stock < 2 ? 'Stok Rendah' : product.stock < 5 ? 'Stok Menipis' : 'Tersedia'}
-                        </span>
+                      {selectedReport === 'stock-by-stock' && (
+                        <td className="border border-gray-300 p-2 text-sm text-center">{product.rating}</td>
+                      )}
+                      {selectedReport === 'stock-by-rating' && (
+                        <td className="border border-gray-300 p-2 text-sm text-center">{product.stock}</td>
+                      )}
+                      <td className="border border-gray-300 p-2 text-sm text-center">
+                        {selectedReport === 'stock-by-stock' || selectedReport === 'low-stock' 
+                          ? product.stock 
+                          : product.rating}
                       </td>
                     </tr>
                   ))}
@@ -1587,15 +1695,10 @@ export default function DashboardPenjual() {
               </table>
             </div>
             
-            <div className="mt-6 text-sm">
-              <p className="font-medium text-[var(--color-navy)] mb-2">Statistik:</p>
-              <p>Total Produk: {pdfData.length}</p>
-              <p>Total Terjual: {pdfData.reduce((acc, product) => acc + product.sold, 0)} unit</p>
-              <p>Total Pendapatan: {formatCurrency(pdfData.reduce((acc, product) => acc + (product.price * product.sold), 0))}</p>
-              <p>Rata-rata Rating: {(pdfData.reduce((acc, product) => acc + product.rating, 0) / pdfData.length).toFixed(1)}</p>
-              {selectedReport === 'low-stock' && (
-                <p>Produk Stok Rendah: {pdfData.filter(p => p.stock < 2).length}</p>
-              )}
+            <div className="mt-6 text-sm text-gray-600 italic">
+              {selectedReport === 'stock-by-stock' && "*) urutkan berdasarkan stock"}
+              {selectedReport === 'stock-by-rating' && "*) urutkan berdasarkan rating"}
+              {selectedReport === 'low-stock' && "*) urutkan berdasarkan kategori dan produk"}
             </div>
           </div>
         </div>
@@ -1749,7 +1852,7 @@ export default function DashboardPenjual() {
                 </h1>
                 <p className="text-[var(--color-teal)]">
                   {activeView === 'dashboard' && 'Ringkasan statistik dan analisis platform'}
-                  {activeView === 'laporan' && 'Generate laporan produk dalam format PDF'}
+                  {activeView === 'laporan' && 'Generate laporan produk sesuai SRS MartPlace'}
                   {activeView === 'kelola-produk' && 'Kelola produk yang Anda jual'}
                   {activeView === 'tambah-produk' && 'Tambahkan produk baru ke toko Anda'}
                   {activeView === 'edit-produk' && 'Edit informasi produk'}
@@ -1770,9 +1873,9 @@ export default function DashboardPenjual() {
           </div>
         </header>
 
-        <div className="p-6">
+        <main className="p-6">
           {renderContent()}
-        </div>
+        </main>
       </div>
 
       {showPdfPreview && renderPdfPreview()}
