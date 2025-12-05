@@ -1,39 +1,36 @@
-// app/admin/dashboard/laporan/page.tsx - WITH PDF DOWNLOAD NOTIFICATION
+// app/admin/dashboard/laporan/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 
 interface SellerData {
   id: string;
-  store_name?: string;
-  plot_email?: string;
   email?: string;
-  phone?: string;
+  name?: string;
+  pic_name?: string;
+  store_name?: string;
+  status?: string;
   verified?: boolean;
   verification_status?: string;
   province?: string;
   city?: string;
   created_at: string;
-  last_active_at?: string;
-}
-
-interface SellerByProvinceData extends SellerData {
-  total_products?: number;
 }
 
 interface ProductData {
   id: string;
   product_name?: string;
-  name?: string;
-  store_name?: string;
   category?: string;
   price: number;
   rating: number;
-  province?: string;
-  city?: string;
-  created_at: string;
   total_reviews?: number;
+  store_name?: string;
+  province?: string;
+  seller_name?: string;
+  created_at: string;
 }
+
+type ReportData = SellerData | ProductData;
 
 export default function LaporanPage() {
   const [startDate, setStartDate] = useState("");
@@ -41,7 +38,7 @@ export default function LaporanPage() {
   const [selectedReport, setSelectedReport] = useState("seller-status");
   const [selectedProvince, setSelectedProvince] = useState("");
   const [provinces, setProvinces] = useState<any[]>([]);
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<ReportData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -50,8 +47,8 @@ export default function LaporanPage() {
     fileName: string;
     downloadPath: string;
   }>({ show: false, fileName: "", downloadPath: "" });
-  const printRef = useRef<HTMLDivElement>(null);
-
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  
   // Fetch provinces on mount
   useEffect(() => {
     fetchProvinces();
@@ -66,6 +63,7 @@ export default function LaporanPage() {
 
   const fetchProvinces = async () => {
     try {
+      console.log("🔄 Fetching provinces...");
       const response = await fetch('/api/admin/laporan', {
         method: 'POST',
         headers: {
@@ -79,13 +77,41 @@ export default function LaporanPage() {
       const result = await response.json();
       
       if (result.success) {
+        console.log(`✅ Loaded ${result.data.length} provinces`);
         setProvinces(result.data);
       } else {
-        setError(`Gagal mengambil data provinsi: ${result.message}`);
+        console.warn("⚠️ Using static provinces due to API error");
+        // Fallback to static provinces
+        const staticProvinces = [
+          {"id":"11","name":"ACEH"},{"id":"12","name":"SUMATERA UTARA"},
+          {"id":"13","name":"SUMATERA BARAT"},{"id":"14","name":"RIAU"},
+          {"id":"15","name":"JAMBI"},{"id":"16","name":"SUMATERA SELATAN"},
+          {"id":"17","name":"BENGKULU"},{"id":"18","name":"LAMPUNG"},
+          {"id":"19","name":"KEPULAUAN BANGKA BELITUNG"},{"id":"21","name":"KEPULAUAN RIAU"},
+          {"id":"31","name":"DKI JAKARTA"},{"id":"32","name":"JAWA BARAT"},
+          {"id":"33","name":"JAWA TENGAH"},{"id":"34","name":"DI YOGYAKARTA"},
+          {"id":"35","name":"JAWA TIMUR"},{"id":"36","name":"BANTEN"},
+          {"id":"51","name":"BALI"},{"id":"52","name":"NUSA TENGGARA BARAT"},
+          {"id":"53","name":"NUSA TENGGARA TIMUR"},{"id":"61","name":"KALIMANTAN BARAT"},
+          {"id":"62","name":"KALIMANTAN TENGAH"},{"id":"63","name":"KALIMANTAN SELATAN"},
+          {"id":"64","name":"KALIMANTAN TIMUR"},{"id":"65","name":"KALIMANTAN UTARA"},
+          {"id":"71","name":"SULAWESI UTARA"},{"id":"72","name":"SULAWESI TENGAH"},
+          {"id":"73","name":"SULAWESI SELATAN"},{"id":"74","name":"SULAWESI TENGGARA"},
+          {"id":"75","name":"GORONTALO"},{"id":"76","name":"SULAWESI BARAT"},
+          {"id":"81","name":"MALUKU"},{"id":"82","name":"MALUKU UTARA"},
+          {"id":"91","name":"PAPUA BARAT"},{"id":"94","name":"PAPUA"}
+        ];
+        setProvinces(staticProvinces);
       }
     } catch (err: any) {
       console.error('Error fetching provinces:', err);
-      setError(`Terjadi kesalahan: ${err.message || 'Unknown error'}`);
+      // Fallback to static provinces
+      const staticProvinces = [
+        {"id":"31","name":"DKI JAKARTA"},{"id":"32","name":"JAWA BARAT"},
+        {"id":"33","name":"JAWA TENGAH"},{"id":"34","name":"DI YOGYAKARTA"},
+        {"id":"35","name":"JAWA TIMUR"},{"id":"36","name":"BANTEN"}
+      ];
+      setProvinces(staticProvinces);
     }
   };
 
@@ -95,6 +121,7 @@ export default function LaporanPage() {
     setData([]);
     
     try {
+      // Build query params
       const params = new URLSearchParams({
         type: selectedReport,
         ...(startDate && { start: startDate }),
@@ -102,26 +129,264 @@ export default function LaporanPage() {
         ...(selectedProvince && selectedReport === 'sellers-by-province' && { province: selectedProvince })
       });
 
-      const response = await fetch(`/api/admin/laporan?${params}`);
+      const apiUrl = `/api/admin/laporan?${params.toString()}`;
+      console.log(`🔄 Fetching report data from: ${apiUrl}`);
       
+      const response = await fetch(apiUrl);
+      
+      console.log(`📊 Response status: ${response.status} ${response.statusText}`);
+      
+      // First check if response is ok
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Try to get error message from response
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        
+        try {
+          const errorText = await response.text();
+          if (errorText) {
+            try {
+              const errorJson = JSON.parse(errorText);
+              errorMessage = errorJson.message || errorJson.error || errorMessage;
+            } catch {
+              errorMessage = errorText;
+            }
+          }
+        } catch {
+          // Ignore error in parsing error response
+        }
+        
+        throw new Error(errorMessage);
       }
       
+      // Try to parse response as JSON
       const result = await response.json();
+      console.log(`📦 API Response:`, result);
       
       if (result.success) {
         setData(result.data || []);
+        console.log(`✅ Loaded ${result.data?.length || 0} records`);
+        
+        // Show warning if using dummy data
+        if (result.metadata?.note?.includes('dummy')) {
+          setError(`⚠️ ${result.message || 'Menggunakan data dummy'}`);
+        }
       } else {
         throw new Error(result.message || "Gagal mengambil data laporan");
       }
     } catch (err: any) {
-      console.error('Error fetching report data:', err);
-      setError(`Gagal mengambil data: ${err.message || 'Unknown error'}`);
+      console.error('❌ Error fetching report data:', err);
+      
+      // User-friendly error messages
+      let userErrorMessage = err.message || "Gagal mengambil data";
+      
+      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        userErrorMessage = "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+      } else if (err.message.includes('500') || err.message.includes('Internal Server Error')) {
+        userErrorMessage = "Server sedang mengalami masalah. Silakan coba lagi nanti.";
+      } else if (err.message.includes('404')) {
+        userErrorMessage = "API endpoint tidak ditemukan. Periksa konfigurasi server.";
+      }
+      
+      setError(userErrorMessage);
       setData([]);
+      
+      // Fallback to dummy data for development
+      if (process.env.NODE_ENV === 'development') {
+        console.log("⚠️ Using fallback dummy data for development");
+        const dummyData = generateDummyData(selectedReport);
+        setData(dummyData);
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to generate dummy data
+  const generateDummyData = (reportType: string): ReportData[] => {
+    console.log(`📋 Generating dummy data for: ${reportType}`);
+    
+    if (reportType === 'seller-status') {
+      return [
+        {
+          id: "1",
+          email: "penjual1@email.com",
+          name: "John Doe",
+          pic_name: "John Doe",
+          store_name: "Toko Elektronik Jaya",
+          status: "Aktif",
+          verified: true,
+          province: "DKI Jakarta",
+          city: "Jakarta Pusat",
+          created_at: "2025-11-20T08:30:00Z"
+        },
+        {
+          id: "2",
+          email: "penjual2@email.com",
+          name: "Jane Smith",
+          pic_name: "Jane Smith",
+          store_name: "Fashion Store",
+          status: "Aktif",
+          verified: true,
+          province: "Jawa Barat",
+          city: "Bandung",
+          created_at: "2025-11-20T09:15:00Z"
+        },
+        {
+          id: "3",
+          email: "penjual3@email.com",
+          name: "Budi Santoso",
+          pic_name: "Budi Santoso",
+          store_name: "Toko Makanan Sehat",
+          status: "Tidak Aktif",
+          verified: false,
+          province: "Jawa Timur",
+          city: "Surabaya",
+          created_at: "2025-11-21T10:20:00Z"
+        },
+        {
+          id: "4",
+          email: "penjual4@email.com",
+          name: "Siti Rahayu",
+          pic_name: "Siti Rahayu",
+          store_name: "Toko Kerajinan",
+          status: "Aktif",
+          verified: true,
+          province: "DI Yogyakarta",
+          city: "Yogyakarta",
+          created_at: "2025-11-22T14:45:00Z"
+        },
+        {
+          id: "5",
+          email: "penjual5@email.com",
+          name: "Andi Wijaya",
+          pic_name: "Andi Wijaya",
+          store_name: "Toko Olahraga",
+          status: "Tidak Aktif",
+          verified: false,
+          province: "Banten",
+          city: "Tangerang",
+          created_at: "2025-11-23T11:10:00Z"
+        }
+      ];
+    } else if (reportType === 'sellers-by-province') {
+      return [
+        {
+          id: "1",
+          store_name: "Nadia Decor",
+          name: "Nadia",
+          pic_name: "Nadia",
+          province: "Sumatera Selatan",
+          city: "Palembang",
+          email: "nadia@decor.com",
+          created_at: "2025-11-20T08:30:00Z"
+        },
+        {
+          id: "2",
+          store_name: "Yoga Gadget",
+          name: "Yoga",
+          pic_name: "Yoga",
+          province: "Sulawesi Selatan",
+          city: "Makassar",
+          email: "yoga@gadget.com",
+          created_at: "2025-11-20T09:15:00Z"
+        },
+        {
+          id: "3",
+          store_name: "Toko Rina Fashion",
+          name: "Rina",
+          pic_name: "Rina",
+          province: "DKI Jakarta",
+          city: "Jakarta Selatan",
+          email: "rina@fashion.com",
+          created_at: "2025-11-20T10:20:00Z"
+        },
+        {
+          id: "4",
+          store_name: "Budi Elektronik",
+          name: "Budi",
+          pic_name: "Budi",
+          province: "Jawa Barat",
+          city: "Bekasi",
+          email: "budi@elektronik.com",
+          created_at: "2025-11-21T11:30:00Z"
+        },
+        {
+          id: "5",
+          store_name: "Siti Craft",
+          name: "Siti",
+          pic_name: "Siti",
+          province: "Jawa Timur",
+          city: "Malang",
+          email: "siti@craft.com",
+          created_at: "2025-11-22T14:45:00Z"
+        }
+      ];
+    } else if (reportType === 'products-rating') {
+      return [
+        {
+          id: "1",
+          product_name: "Laptop Gaming RTX 4060",
+          category: "Elektronik",
+          price: 15000000,
+          rating: 4.8,
+          total_reviews: 128,
+          store_name: "Toko Elektronik Jaya",
+          province: "DKI Jakarta",
+          seller_name: "John Doe",
+          created_at: "2025-11-20T08:30:00Z"
+        },
+        {
+          id: "2",
+          product_name: "Sepatu Running Premium",
+          category: "Olahraga",
+          price: 850000,
+          rating: 4.6,
+          total_reviews: 89,
+          store_name: "Toko Olahraga",
+          province: "Banten",
+          seller_name: "Andi Wijaya",
+          created_at: "2025-11-21T10:15:00Z"
+        },
+        {
+          id: "3",
+          product_name: "Dress Casual Modern",
+          category: "Fashion",
+          price: 350000,
+          rating: 4.5,
+          total_reviews: 67,
+          store_name: "Fashion Store",
+          province: "Jawa Barat",
+          seller_name: "Jane Smith",
+          created_at: "2025-11-22T13:20:00Z"
+        },
+        {
+          id: "4",
+          product_name: "Panci Stainless Steel",
+          category: "Dapur",
+          price: 250000,
+          rating: 4.3,
+          total_reviews: 45,
+          store_name: "Toko Makanan Sehat",
+          province: "Jawa Timur",
+          seller_name: "Budi Santoso",
+          created_at: "2025-11-23T09:40:00Z"
+        },
+        {
+          id: "5",
+          product_name: "Kursi Gaming Ergonomis",
+          category: "Furniture",
+          price: 1200000,
+          rating: 4.2,
+          total_reviews: 32,
+          store_name: "Nadia Decor",
+          province: "Sumatera Selatan",
+          seller_name: "Nadia",
+          created_at: "2025-11-24T16:10:00Z"
+        }
+      ];
+    }
+    
+    return [];
   };
 
   const handleGeneratePDF = () => {
@@ -132,15 +397,14 @@ export default function LaporanPage() {
 
     setIsGeneratingPDF(true);
 
-    // Nama file yang akan disimpan
+    // Nama file
     const reportType = getDisplayTitle().replace(/\s+/g, '_');
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const fileName = `Laporan_${reportType}_${dateStr}.pdf`;
     
-    // Mendapatkan direktori download default
+    // Path download
     const getDownloadPath = () => {
       if (typeof navigator !== 'undefined') {
-        // Deteksi OS
         const userAgent = navigator.userAgent;
         
         if (userAgent.includes('Windows')) {
@@ -156,14 +420,14 @@ export default function LaporanPage() {
 
     const downloadPath = getDownloadPath();
 
-    // Tampilkan notifikasi awal
+    // Tampilkan notifikasi
     setPdfNotification({
       show: true,
       fileName,
       downloadPath
     });
 
-    // Buat window baru untuk PDF
+    // Buat window untuk PDF
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert("⚠️ Pop-up diblokir. Izinkan pop-up untuk generate PDF.");
@@ -190,7 +454,6 @@ export default function LaporanPage() {
         <title>${title}</title>
         <meta charset="UTF-8">
         <style>
-          /* Reset dan dasar */
           * {
             margin: 0;
             padding: 0;
@@ -198,127 +461,106 @@ export default function LaporanPage() {
           }
           
           body { 
-            font-family: 'Segoe UI', Arial, sans-serif; 
+            font-family: 'Arial', sans-serif; 
             margin: 15mm;
             color: #333;
             line-height: 1.4;
-            font-size: 12px;
+            font-size: 11px;
           }
           
-          /* Header */
           .header { 
             text-align: center; 
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 3px solid #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
           }
           
           .header h1 { 
             margin: 0 0 5px 0; 
-            font-size: 22px; 
+            font-size: 18px; 
             color: #2c3e50;
-            font-weight: 700;
+            font-weight: bold;
           }
           
           .subtitle {
-            font-size: 11px;
-            color: #7f8c8d;
-            font-weight: 500;
-            letter-spacing: 0.5px;
+            font-size: 10px;
+            color: #666;
           }
           
-          /* Info box */
           .info-box {
-            margin-bottom: 20px;
-            font-size: 11px;
+            margin-bottom: 15px;
+            font-size: 10px;
             color: #2c3e50;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            border-left: 4px solid #3498db;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            background: #f5f7fa;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 3px solid #3498db;
           }
           
           .info-box p {
-            margin: 4px 0;
-            line-height: 1.5;
+            margin: 3px 0;
           }
           
           .info-box strong {
             color: #2c3e50;
-            font-weight: 600;
           }
           
-          /* Table styling */
           table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 10px;
-            page-break-inside: auto;
+            margin: 15px 0;
+            font-size: 9px;
           }
           
           thead {
-            background: linear-gradient(135deg, #2c3e50, #4a6491);
+            background: #2c3e50;
           }
           
           th {
             color: white;
-            padding: 10px 8px;
+            padding: 8px 5px;
             text-align: left;
             border: 1px solid #1a252f;
-            font-weight: 600;
-            font-size: 10px;
+            font-weight: bold;
           }
           
           td {
-            padding: 8px;
-            border: 1px solid #dee2e6;
-            vertical-align: middle;
-          }
-          
-          tbody tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
+            padding: 6px 5px;
+            border: 1px solid #ddd;
+            vertical-align: top;
           }
           
           tbody tr:nth-child(even) {
             background-color: #f8f9fa;
           }
           
-          tbody tr:hover {
-            background-color: #e8f4f8;
-          }
-          
-          /* Status badges */
           .status-badge {
             display: inline-block;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 9px;
-            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 8px;
+            font-weight: bold;
             text-align: center;
-            min-width: 80px;
+            min-width: 70px;
           }
           
-          .status-verified {
+          .status-aktif {
             background-color: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
           }
           
-          .status-pending {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
+          .status-tidak-aktif {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
           }
           
-          /* Rating stars */
           .rating {
             display: inline-flex;
             align-items: center;
-            gap: 3px;
-            font-weight: 600;
+            gap: 2px;
+            font-weight: bold;
           }
           
           .rating-high {
@@ -333,83 +575,44 @@ export default function LaporanPage() {
             color: #e74c3c;
           }
           
-          /* Footer */
           .footer {
-            margin-top: 30px;
-            font-size: 9px;
-            color: #7f8c8d;
+            margin-top: 20px;
+            font-size: 8px;
+            color: #666;
             text-align: center;
-            padding-top: 15px;
-            border-top: 1px solid #ddd;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
           }
           
-          .footer p {
-            margin: 3px 0;
-          }
-          
-          /* Print controls */
           .print-controls {
             text-align: center;
-            margin: 25px 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            border-radius: 8px;
-            border: 2px dashed #3498db;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px dashed #3498db;
           }
           
           .btn-print {
-            background: linear-gradient(135deg, #2c3e50, #4a6491);
+            background: #2c3e50;
             color: white;
             border: none;
-            padding: 12px 28px;
-            border-radius: 6px;
+            padding: 10px 20px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            margin: 10px 5px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-          }
-          
-          .btn-print:hover {
-            background: linear-gradient(135deg, #1a252f, #3a5177);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            font-size: 12px;
+            font-weight: bold;
           }
           
           .download-info {
             background: #e3f2fd;
             border: 1px solid #bbdefb;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-            text-align: left;
-            font-size: 12px;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 10px;
           }
           
-          .download-info h3 {
-            margin: 0 0 10px 0;
-            color: #1565c0;
-            font-size: 14px;
-          }
-          
-          .download-info p {
-            margin: 6px 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          }
-          
-          .download-info strong {
-            color: #2c3e50;
-            min-width: 140px;
-            display: inline-block;
-          }
-          
-          /* Print media queries */
           @media print {
             @page {
               size: A4 portrait;
@@ -418,7 +621,7 @@ export default function LaporanPage() {
             
             body { 
               margin: 0;
-              font-size: 10px;
+              font-size: 9px;
             }
             
             .print-controls,
@@ -426,49 +629,6 @@ export default function LaporanPage() {
             .btn-print {
               display: none !important;
             }
-            
-            .header {
-              margin-bottom: 15px;
-            }
-            
-            table {
-              font-size: 9px;
-            }
-            
-            th, td {
-              padding: 6px 5px;
-            }
-            
-            .info-box {
-              padding: 10px;
-              margin-bottom: 15px;
-            }
-          }
-          
-          /* Page breaks */
-          .page-break {
-            page-break-before: always;
-          }
-          
-          /* Utility classes */
-          .text-center {
-            text-align: center;
-          }
-          
-          .text-right {
-            text-align: right;
-          }
-          
-          .font-bold {
-            font-weight: 700;
-          }
-          
-          .mb-10 {
-            margin-bottom: 10px;
-          }
-          
-          .mt-20 {
-            margin-top: 20px;
           }
         </style>
       </head>
@@ -491,19 +651,9 @@ export default function LaporanPage() {
         <!-- Download Info -->
         <div class="download-info">
           <h3>📋 Informasi File PDF</h3>
-          <p>
-            <strong>📄 Nama File:</strong> 
-            <span style="background: #fff3cd; padding: 4px 8px; border-radius: 4px; font-family: monospace;">
-              ${fileName}
-            </span>
-          </p>
-          <p>
-            <strong>📁 Lokasi Penyimpanan:</strong> 
-            <span style="color: #2c3e50; font-weight: 500;">
-              ${downloadPath}
-            </span>
-          </p>
-          <p style="color: #e74c3c; font-weight: 500; margin-top: 10px;">
+          <p><strong>📄 Nama File:</strong> ${fileName}</p>
+          <p><strong>📁 Lokasi Penyimpanan:</strong> ${downloadPath}</p>
+          <p style="color: #e74c3c; font-weight: bold; margin-top: 5px;">
             ⚠️ Pilih "Save as PDF" atau "Microsoft Print to PDF" di dialog print
           </p>
         </div>
@@ -511,98 +661,106 @@ export default function LaporanPage() {
 
     // Tabel berdasarkan jenis laporan
     if (selectedReport === "seller-status") {
+      // Laporan Daftar Akun Penjual Berdasarkan Status
       htmlContent += `
         <table>
           <thead>
             <tr>
               <th width="5%">No</th>
+              <th width="25%">Nama User</th>
+              <th width="20%">Nama PIC</th>
               <th width="25%">Nama Toko</th>
-              <th width="20%">Email</th>
-              <th width="15%">Provinsi</th>
               <th width="15%">Status</th>
-              <th width="20%">Tanggal Bergabung</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.map((item, index) => `
-              <tr>
-                <td class="text-center">${index + 1}</td>
-                <td>${escapeHtml(item.store_name || '-')}</td>
-                <td>${escapeHtml(item.plot_email || item.email || '-')}</td>
-                <td>${escapeHtml(item.province || '-')}</td>
-                <td class="text-center">
-                  <span class="status-badge ${item.verified ? 'status-verified' : 'status-pending'}">
-                    ${item.verified ? '✓ Terverifikasi' : '⏳ Menunggu'}
-                  </span>
-                </td>
-                <td>${formatDateForPDF(item.created_at)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
-    } else if (selectedReport === "sellers-by-province") {
-      htmlContent += `
-        <table>
-          <thead>
-            <tr>
-              <th width="5%">No</th>
-              <th width="20%">Nama Toko</th>
-              <th width="20%">Email</th>
-              <th width="15%">Provinsi</th>
-              <th width="15%">Kota</th>
-              <th width="10%">Total Produk</th>
-              <th width="15%">Tanggal Bergabung</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.map((item, index) => `
-              <tr>
-                <td class="text-center">${index + 1}</td>
-                <td>${escapeHtml(item.store_name || '-')}</td>
-                <td>${escapeHtml(item.plot_email || item.email || '-')}</td>
-                <td>${escapeHtml(item.province || '-')}</td>
-                <td>${escapeHtml(item.city || '-')}</td>
-                <td class="text-center font-bold">${item.total_products || 0}</td>
-                <td>${formatDateForPDF(item.created_at)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
-    } else if (selectedReport === "products-rating") {
-      htmlContent += `
-        <table>
-          <thead>
-            <tr>
-              <th width="5%">No</th>
-              <th width="20%">Nama Produk</th>
-              <th width="15%">Nama Toko</th>
-              <th width="15%">Kategori</th>
-              <th width="15%">Harga</th>
-              <th width="10%">Rating</th>
-              <th width="10%">Provinsi</th>
-              <th width="10%">Tanggal Dibuat</th>
+              <th width="10%">Tanggal Bergabung</th>
             </tr>
           </thead>
           <tbody>
             ${data.map((item, index) => {
-              const rating = item.rating || 0;
-              const ratingClass = rating >= 4 ? 'rating-high' : rating >= 3 ? 'rating-medium' : 'rating-low';
+              const sellerItem = item as SellerData;
+              const status = sellerItem.status || (sellerItem.verified ? 'Aktif' : 'Tidak Aktif');
+              
               return `
                 <tr>
                   <td class="text-center">${index + 1}</td>
-                  <td>${escapeHtml(item.product_name || item.name || '-')}</td>
-                  <td>${escapeHtml(item.store_name || '-')}</td>
-                  <td>${escapeHtml(item.category || '-')}</td>
-                  <td class="text-right">${formatCurrencyForPDF(item.price || 0)}</td>
+                  <td>${escapeHtml(sellerItem.email || '-')}</td>
+                  <td>${escapeHtml(sellerItem.name || sellerItem.pic_name || '-')}</td>
+                  <td>${escapeHtml(sellerItem.store_name || '-')}</td>
+                  <td class="text-center">
+                    <span class="status-badge ${status === 'Aktif' ? 'status-aktif' : 'status-tidak-aktif'}">
+                      ${status}
+                    </span>
+                  </td>
+                  <td>${formatDateForPDF(sellerItem.created_at)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } else if (selectedReport === "sellers-by-province") {
+      // Laporan Daftar Toko Berdasarkan Lokasi Provinsi
+      htmlContent += `
+        <table>
+          <thead>
+            <tr>
+              <th width="5%">No</th>
+              <th width="35%">Nama Toko</th>
+              <th width="25%">Nama PIC</th>
+              <th width="20%">Provinsi</th>
+              <th width="15%">Kota</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map((item, index) => {
+              const sellerItem = item as SellerData;
+              return `
+                <tr>
+                  <td class="text-center">${index + 1}</td>
+                  <td>${escapeHtml(sellerItem.store_name || '-')}</td>
+                  <td>${escapeHtml(sellerItem.name || sellerItem.pic_name || '-')}</td>
+                  <td>${escapeHtml(sellerItem.province || '-')}</td>
+                  <td>${escapeHtml(sellerItem.city || '-')}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } else if (selectedReport === "products-rating") {
+      // Laporan Daftar Produk Berdasarkan Rating
+      htmlContent += `
+        <table>
+          <thead>
+            <tr>
+              <th width="5%">No</th>
+              <th width="20%">Produk</th>
+              <th width="15%">Kategori</th>
+              <th width="15%">Harga</th>
+              <th width="10%">Rating</th>
+              <th width="20%">Nama Toko</th>
+              <th width="15%">Provinsi</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map((item, index) => {
+              const productItem = item as ProductData;
+              const rating = productItem.rating || 0;
+              const ratingClass = rating >= 4 ? 'rating-high' : rating >= 3 ? 'rating-medium' : 'rating-low';
+              
+              return `
+                <tr>
+                  <td class="text-center">${index + 1}</td>
+                  <td>${escapeHtml(productItem.product_name || '-')}</td>
+                  <td>${escapeHtml(productItem.category || '-')}</td>
+                  <td class="text-right">${formatCurrencyForPDF(productItem.price || 0)}</td>
                   <td class="text-center">
                     <span class="rating ${ratingClass}">
                       ★ ${rating.toFixed(1)}
+                      ${productItem.total_reviews ? `(${productItem.total_reviews})` : ''}
                     </span>
                   </td>
-                  <td>${escapeHtml(item.province || '-')}</td>
-                  <td>${formatDateForPDF(item.created_at)}</td>
+                  <td>${escapeHtml(productItem.store_name || '-')}</td>
+                  <td>${escapeHtml(productItem.province || '-')}</td>
                 </tr>
               `;
             }).join('')}
@@ -621,101 +779,36 @@ export default function LaporanPage() {
         
         <!-- Print Controls -->
         <div class="print-controls">
-          <button class="btn-print" onclick="handlePrintAndNotify()">
+          <button class="btn-print" onclick="window.print()">
             🖨️ Cetak / Save as PDF
           </button>
-          <p style="margin-top: 15px; color: #666; font-size: 12px;">
-            Klik tombol di atas untuk membuka dialog print<br>
-            Pilih printer "Save as PDF" atau "Microsoft Print to PDF"
+          <p style="margin-top: 10px; color: #666; font-size: 10px;">
+            Klik tombol di atas untuk membuka dialog print
           </p>
         </div>
         
         <script>
-          let hasPrinted = false;
-          
-          function handlePrintAndNotify() {
-            window.print();
-            
-            // Track jika sudah print
-            if (!hasPrinted) {
-              hasPrinted = true;
-              
-              // Kirim notifikasi ke parent window setelah delay
-              setTimeout(() => {
-                try {
-                  if (window.opener && !window.opener.closed) {
-                    window.opener.postMessage({
-                      type: 'PDF_DOWNLOAD_COMPLETE',
-                      fileName: '${fileName}',
-                      downloadPath: '${downloadPath}'
-                    }, '*');
-                  }
-                } catch(e) {
-                  console.log('Notifikasi berhasil dikirim');
-                }
-                
-                // Tutup window setelah beberapa detik
-                setTimeout(() => {
-                  window.close();
-                }, 2000);
-              }, 1000);
-            }
-          }
-          
-          // Auto trigger print setelah halaman load
+          // Auto print setelah halaman load
           window.onload = function() {
             setTimeout(function() {
-              handlePrintAndNotify();
+              window.print();
             }, 1000);
           };
-          
-          // Listen for print dialog events
-          window.addEventListener('beforeprint', function() {
-            console.log('Dialog print dibuka - Pilih "Save as PDF"');
-          });
-          
-          window.addEventListener('afterprint', function() {
-            console.log('Dialog print ditutup');
-          });
-          
-          // Listen for messages from this window (untuk debugging)
-          window.addEventListener('message', function(event) {
-            if (event.data === 'PRINT_NOW') {
-              handlePrintAndNotify();
-            }
-          });
         </script>
       </body>
       </html>
     `;
 
-    // Buka window baru
+    // Buka window dan tulis HTML
     printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
 
-    // Listen untuk notifikasi dari print window
-    const messageHandler = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'PDF_DOWNLOAD_COMPLETE') {
-        // Notifikasi sukses
-        setTimeout(() => {
-          alert(`✅ PDF BERHASIL DIUNDUH!\n\n📄 File: ${event.data.fileName}\n📁 Tersimpan di: ${event.data.downloadPath}\n\nFile telah tersimpan di folder Downloads Anda.`);
-          setIsGeneratingPDF(false);
-          setPdfNotification({ show: false, fileName: "", downloadPath: "" });
-        }, 500);
-        
-        // Remove event listener
-        window.removeEventListener('message', messageHandler);
-      }
-    };
-
-    window.addEventListener('message', messageHandler);
-
-    // Timeout fallback
+    // Timer untuk reset state
     setTimeout(() => {
       setIsGeneratingPDF(false);
       setPdfNotification({ show: false, fileName: "", downloadPath: "" });
-    }, 30000); // 30 detik timeout
+    }, 10000);
   };
 
   // Helper functions
@@ -746,11 +839,11 @@ export default function LaporanPage() {
   const getDisplayTitle = (): string => {
     switch(selectedReport) {
       case "seller-status":
-        return "Laporan Daftar Akun Penjual Aktif dan Tidak Aktif";
+        return "Laporan Daftar Akun Penjual Berdasarkan Status";
       case "sellers-by-province":
-        return "Laporan Daftar Penjual untuk Setiap Lokasi Provinsi";
+        return "Laporan Daftar Toko Berdasarkan Lokasi Provinsi";
       case "products-rating":
-        return "Laporan Daftar Produk dan Ratingnya";
+        return "Laporan Daftar Produk Berdasarkan Rating";
       default:
         return "Laporan Marketplace";
     }
@@ -773,34 +866,81 @@ export default function LaporanPage() {
     }
   };
 
-  const getStatusBadge = (verified?: boolean) => {
-    if (verified) {
+  const getStatusBadge = (status?: string, verified?: boolean) => {
+    const actualStatus = status || (verified ? 'Aktif' : 'Tidak Aktif');
+    
+    if (actualStatus === 'Aktif') {
       return (
         <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
-          ✓ Terverifikasi
+          ✓ Aktif
         </span>
       );
     }
     
     return (
-      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
-        ⏳ Menunggu
+      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+        ✗ Tidak Aktif
       </span>
+    );
+  };
+
+  // Debug info component
+  const DebugInfo = () => {
+    if (!showDebugInfo) return null;
+    
+    return (
+      <div className="mt-4 p-4 bg-gray-900 text-gray-100 rounded-lg text-sm font-mono">
+        <div className="flex justify-between items-center mb-2">
+          <span className="font-bold">Debug Information</span>
+          <button 
+            onClick={() => setShowDebugInfo(false)}
+            className="text-gray-400 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="space-y-1">
+          <div>Report Type: <span className="text-yellow-300">{selectedReport}</span></div>
+          <div>Data Count: <span className="text-yellow-300">{data.length}</span></div>
+          <div>Loading: <span className="text-yellow-300">{loading.toString()}</span></div>
+          <div>Error: <span className="text-red-300">{error || 'None'}</span></div>
+          <div>API Endpoint: <span className="text-blue-300">/api/admin/laporan</span></div>
+          <div className="pt-2 border-t border-gray-700">
+            <button
+              onClick={fetchReportData}
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
+            >
+              Test API Call
+            </button>
+          </div>
+        </div>
+      </div>
     );
   };
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Laporan Platform</h1>
-        <p className="text-gray-600 mt-1">Generate laporan untuk manajemen platform (Format PDF)</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Laporan Platform</h1>
+          <p className="text-gray-600 mt-1">Generate laporan untuk manajemen platform (Format PDF)</p>
+        </div>
+        <button
+          onClick={() => setShowDebugInfo(!showDebugInfo)}
+          className="px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded"
+        >
+          {showDebugInfo ? 'Hide Debug' : 'Show Debug'}
+        </button>
       </div>
+
+      {/* Debug Info */}
+      <DebugInfo />
 
       {/* PDF Notification Modal */}
       {pdfNotification.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="text-center mb-6">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
                 <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -809,7 +949,7 @@ export default function LaporanPage() {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Mempersiapkan PDF</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Tunggu sebentar, PDF sedang dipersiapkan...
+                PDF sedang dipersiapkan...
               </p>
             </div>
             
@@ -849,22 +989,46 @@ export default function LaporanPage() {
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 animate-fadeIn">
-          <div className="flex">
+        <div className={`p-4 rounded-lg border-l-4 ${
+          error.includes('dummy') || error.includes('⚠️') 
+            ? 'bg-yellow-50 border-yellow-500 text-yellow-800' 
+            : 'bg-red-50 border-red-500 text-red-800'
+        }`}>
+          <div className="flex items-start">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
+              {error.includes('dummy') || error.includes('⚠️') ? (
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              )}
             </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-              <button 
-                onClick={fetchReportData}
-                className="mt-2 text-sm text-red-600 hover:text-red-500 underline"
-              >
-                Coba lagi
-              </button>
+            <div className="ml-3 flex-1">
+              <p className="text-sm">{error}</p>
+              {!error.includes('dummy') && !error.includes('⚠️') && (
+                <div className="mt-2">
+                  <button 
+                    onClick={fetchReportData}
+                    className={`text-sm ${
+                      error.includes('dummy') || error.includes('⚠️') 
+                        ? 'text-yellow-600 hover:text-yellow-500' 
+                        : 'text-red-600 hover:text-red-500'
+                    } underline`}
+                  >
+                    Coba lagi
+                  </button>
+                </div>
+              )}
             </div>
+            <button 
+              onClick={() => setError("")}
+              className="ml-3 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
@@ -876,27 +1040,27 @@ export default function LaporanPage() {
           {[
             { 
               value: 'seller-status', 
-              label: 'Laporan Akun Penjual',
-              desc: 'Aktif / Tidak Aktif',
+              label: 'Laporan Daftar Akun Penjual',
+              desc: 'Berdasarkan Status (Aktif/Tidak Aktif)',
               icon: '👤'
             },
             { 
               value: 'sellers-by-province', 
-              label: 'Penjual per Provinsi',
-              desc: 'Distribusi lokasi',
+              label: 'Laporan Daftar Toko',
+              desc: 'Berdasarkan Lokasi Provinsi',
               icon: '🗺️'
             },
             { 
               value: 'products-rating', 
-              label: 'Produk & Rating',
-              desc: 'Rating produk',
+              label: 'Laporan Daftar Produk',
+              desc: 'Berdasarkan Rating',
               icon: '⭐'
             }
           ].map((report) => (
             <button
               key={report.value}
               onClick={() => setSelectedReport(report.value)}
-              className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+              className={`p-4 rounded-lg border-2 transition-all ${
                 selectedReport === report.value
                   ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
@@ -926,7 +1090,7 @@ export default function LaporanPage() {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -938,7 +1102,7 @@ export default function LaporanPage() {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
@@ -951,7 +1115,7 @@ export default function LaporanPage() {
               <select
                 value={selectedProvince}
                 onChange={(e) => setSelectedProvince(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
                 <option value="">Semua Provinsi</option>
                 {provinces.map((province) => (
@@ -972,18 +1136,12 @@ export default function LaporanPage() {
             >
               {isGeneratingPDF ? (
                 <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                   <span>Menyiapkan PDF...</span>
                 </>
               ) : loading ? (
                 <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                   <span>Memuat Data...</span>
                 </>
               ) : (
@@ -1000,9 +1158,15 @@ export default function LaporanPage() {
       </div>
 
       {/* Report Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 shadow-sm">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
         <h2 className="text-2xl font-bold text-gray-900">{getDisplayTitle()}</h2>
         <div className="flex flex-wrap gap-4 mt-3">
+          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border">
+            <span className="text-gray-500 text-sm">📊</span>
+            <span className="text-sm text-gray-700">
+              Total Data: <span className="font-semibold">{data.length}</span> records
+            </span>
+          </div>
           {(startDate || endDate) && (
             <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border">
               <span className="text-gray-500 text-sm">📅</span>
@@ -1019,16 +1183,6 @@ export default function LaporanPage() {
               </span>
             </div>
           )}
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border">
-            <span className="text-gray-500 text-sm">📊</span>
-            <span className="text-sm text-gray-700">
-              Total Data: <span className="font-semibold">{data.length}</span> records
-            </span>
-          </div>
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border">
-            <span className="text-gray-500 text-sm">📄</span>
-            <span className="text-sm text-gray-700">Format: PDF Document</span>
-          </div>
         </div>
       </div>
 
@@ -1055,39 +1209,36 @@ export default function LaporanPage() {
               Semua data akan termasuk dalam file PDF
             </p>
           </div>
-          <div className="overflow-x-auto max-h-96">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="bg-gray-50">
                 <tr>
                   {selectedReport === "seller-status" && (
                     <>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">No</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama User</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama PIC</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama Toko</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Email</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Provinsi</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Bergabung</th>
                     </>
                   )}
                   {selectedReport === "sellers-by-province" && (
                     <>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">No</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama Toko</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Email</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama PIC</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Provinsi</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Kota</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Produk</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Bergabung</th>
                     </>
                   )}
                   {selectedReport === "products-rating" && (
                     <>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">No</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Produk</th>
-                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Toko</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Kategori</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Harga</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Rating</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Nama Toko</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Provinsi</th>
                     </>
                   )}
@@ -1096,43 +1247,35 @@ export default function LaporanPage() {
               
               <tbody className="divide-y divide-gray-100">
                 {data.slice(0, 10).map((item, index) => (
-                  <tr key={item.id || index} className="hover:bg-blue-50 transition-colors">
+                  <tr key={item.id || index} className="hover:bg-gray-50">
                     {selectedReport === "seller-status" && (
                       <>
                         <td className="px-4 py-3 text-gray-600">{index + 1}</td>
-                        <td className="px-4 py-3 font-medium">{item.store_name || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{item.plot_email || item.email || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{item.province || '-'}</td>
-                        <td className="px-4 py-3">{getStatusBadge(item.verified)}</td>
-                        <td className="px-4 py-3 text-gray-600">{formatDate(item.created_at)}</td>
+                        <td className="px-4 py-3 text-gray-700">{(item as SellerData).email || '-'}</td>
+                        <td className="px-4 py-3 font-medium">{(item as SellerData).name || (item as SellerData).pic_name || '-'}</td>
+                        <td className="px-4 py-3 text-gray-700">{(item as SellerData).store_name || '-'}</td>
+                        <td className="px-4 py-3">{getStatusBadge((item as SellerData).status, (item as SellerData).verified)}</td>
                       </>
                     )}
                     {selectedReport === "sellers-by-province" && (
                       <>
                         <td className="px-4 py-3 text-gray-600">{index + 1}</td>
-                        <td className="px-4 py-3 font-medium">{item.store_name || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{item.plot_email || item.email || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{item.province || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{item.city || '-'}</td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center justify-center bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                            {item.total_products || 0}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">{formatDate(item.created_at)}</td>
+                        <td className="px-4 py-3 font-medium">{(item as SellerData).store_name || '-'}</td>
+                        <td className="px-4 py-3">{(item as SellerData).name || (item as SellerData).pic_name || '-'}</td>
+                        <td className="px-4 py-3 text-gray-700">{(item as SellerData).province || '-'}</td>
+                        <td className="px-4 py-3 text-gray-700">{(item as SellerData).city || '-'}</td>
                       </>
                     )}
                     {selectedReport === "products-rating" && (
                       <>
                         <td className="px-4 py-3 text-gray-600">{index + 1}</td>
-                        <td className="px-4 py-3 font-medium text-gray-800">{item.product_name || item.name || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{item.store_name || '-'}</td>
+                        <td className="px-4 py-3 font-medium text-gray-800">{(item as ProductData).product_name || '-'}</td>
                         <td className="px-4 py-3">
                           <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                            {item.category || '-'}
+                            {(item as ProductData).category || '-'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-semibold text-gray-800">{formatCurrency(item.price || 0)}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-800">{formatCurrency((item as ProductData).price || 0)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
                             <div className="flex">
@@ -1140,7 +1283,7 @@ export default function LaporanPage() {
                                 <span 
                                   key={star} 
                                   className={`text-sm ${
-                                    star <= Math.floor(item.rating || 0) 
+                                    star <= Math.floor((item as ProductData).rating || 0) 
                                       ? 'text-yellow-500' 
                                       : 'text-gray-300'
                                   }`}
@@ -1149,10 +1292,11 @@ export default function LaporanPage() {
                                 </span>
                               ))}
                             </div>
-                            <span className="text-gray-700 font-medium">{item.rating?.toFixed(1) || '0.0'}</span>
+                            <span className="text-gray-700 font-medium">{(item as ProductData).rating?.toFixed(1) || '0.0'}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-700">{item.province || '-'}</td>
+                        <td className="px-4 py-3 text-gray-700">{(item as ProductData).store_name || '-'}</td>
+                        <td className="px-4 py-3 text-gray-700">{(item as ProductData).province || '-'}</td>
                       </>
                     )}
                   </tr>
@@ -1160,13 +1304,6 @@ export default function LaporanPage() {
               </tbody>
             </table>
           </div>
-          {data.length > 10 && (
-            <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 text-center border-t">
-              <p className="text-sm text-gray-600">
-                <span className="font-semibold">{data.length - 10} record lagi</span> akan termasuk dalam PDF
-              </p>
-            </div>
-          )}
         </div>
       )}
 
@@ -1179,120 +1316,11 @@ export default function LaporanPage() {
             </svg>
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Belum ada data</h3>
-          <p className="text-gray-500 max-w-md mx-auto mb-6">
-            Tidak ada data yang ditemukan untuk filter yang dipilih. 
-            Coba ubah tanggal atau pilih jenis laporan lain.
+          <p className="text-gray-500 mb-6">
+            Tidak ada data yang ditemukan untuk filter yang dipilih.
           </p>
-          <button
-            onClick={() => {
-              setStartDate("");
-              setEndDate("");
-              setSelectedProvince("");
-            }}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium"
-          >
-            Reset Filter
-          </button>
         </div>
       )}
-
-      {/* Statistics Cards */}
-      {!loading && data.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow border border-gray-200 p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 shadow">
-                <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Data</p>
-                <p className="text-3xl font-bold text-gray-900">{data.length}</p>
-                <p className="text-xs text-gray-500">records tersedia</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow border border-gray-200 p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-3 shadow">
-                <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Jenis Laporan</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {selectedReport === "seller-status" && "Akun Penjual"}
-                  {selectedReport === "sellers-by-province" && "Penjual per Provinsi"}
-                  {selectedReport === "products-rating" && "Produk & Rating"}
-                </p>
-                <p className="text-xs text-gray-500">Format terpilih</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow border border-gray-200 p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-3 shadow">
-                <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Output Format</p>
-                <p className="text-xl font-bold text-gray-900">PDF Document</p>
-                <p className="text-xs text-gray-500">Siap diunduh</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PDF Tips */}
-      {data.length > 0 && (
-        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-5">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 bg-yellow-100 p-2 rounded-lg">
-              <span className="text-yellow-600 text-xl">💡</span>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-800 mb-2">Tips Unduh PDF</h4>
-              <ul className="text-sm text-gray-600 space-y-1.5">
-                <li className="flex items-center gap-2">
-                  <span className="text-yellow-500">•</span>
-                  Klik "Generate PDF" untuk memulai proses
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-yellow-500">•</span>
-                  Di dialog print, pilih <strong>"Save as PDF"</strong> atau <strong>"Microsoft Print to PDF"</strong>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-yellow-500">•</span>
-                  Pilih folder penyimpanan (default: Downloads)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-yellow-500">•</span>
-                  Notifikasi akan muncul saat file berhasil tersimpan
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tambahkan style untuk animasi */}
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 }
