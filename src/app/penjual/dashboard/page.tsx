@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  AreaChart, Area, Cell
+  AreaChart, Area
 } from "recharts";
 import { supabase } from "@/lib/supabase";
 
 // Update interface sesuai dengan database
 interface Product {
   id: number;
-  name_id: string;
+  name: string;
   category: string;
   price: number;
   stock: number;
@@ -22,14 +22,14 @@ interface Product {
   city: string;
   image_url: string;
   created_at: string;
+  seller_id: number;
   // Tambahan untuk frontend
   sold?: number;
   rating?: number;
-  name?: string;
 }
 
 interface Seller {
-  id: string;
+  id: number;
   store_name: string;
   description: string;
   pic_name: string;
@@ -110,22 +110,24 @@ export default function DashboardPenjual() {
   const [selectedReport, setSelectedReport] = useState<ReportType>('stock-by-stock');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [newProduct, setNewProduct] = useState({
-    name_id: "",
+    name: "",
     category: "",
     price: "",
     stock: "",
     description: "",
-    condition: "Baru",
+    condition: "baru",
     province: "",
     city: "",
     image_url: "",
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfData, setPdfData] = useState<Product[]>([]);
   const [pdfTitle, setPdfTitle] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
+  const [uploading, setUploading] = useState(false);
 
   // Dummy data generator untuk data yang tidak ada di database
   const generateRandomSold = useCallback(() => Math.floor(Math.random() * 50) + 10, []);
@@ -176,14 +178,14 @@ export default function DashboardPenjual() {
   }, [router]);
 
   // Fetch products for specific seller
-  const fetchSellerProducts = async (sellerId: string) => {
+  const fetchSellerProducts = async (sellerId: number) => {
     try {
       setIsLoading(true);
       
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
-        .eq('seller_id', sellerId) // Asumsi ada kolom seller_id di tabel products
+        .eq('seller_id', sellerId)
         .order('created_at', { ascending: false });
 
       if (productsError) {
@@ -195,8 +197,7 @@ export default function DashboardPenjual() {
       const productsWithAdditionalData = productsData.map(product => ({
         ...product,
         sold: generateRandomSold(),
-        rating: generateRandomRating(),
-        name: product.name_id // Menggunakan name_id sebagai nama produk
+        rating: generateRandomRating()
       })) as Product[];
 
       setProducts(productsWithAdditionalData);
@@ -231,6 +232,34 @@ export default function DashboardPenjual() {
 
   const handlePrevMonths = () => {
     setCurrentMonthIndex(prev => Math.max(prev - 3, 0));
+  };
+
+  // Function to upload image to Supabase Storage
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `products/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        return null;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -317,7 +346,7 @@ export default function DashboardPenjual() {
       case 'low-stock':
         dataToExport = [...products]
           .filter(product => product.stock < 2)
-          .sort((a, b) => a.category.localeCompare(b.category) || a.name_id.localeCompare(b.name_id));
+          .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
         title = "Laporan Daftar Produk Segera Dipesan";
         reportId = "SRS-MartPlace-14";
         break;
@@ -466,7 +495,7 @@ export default function DashboardPenjual() {
             ${pdfData.map((product, index) => `
               <tr>
                 <td>${index + 1}</td>
-                <td>${product.name_id}</td>
+                <td>${product.name}</td>
                 <td>${product.category}</td>
                 <td>${formatCurrency(product.price)}</td>
                 <td>${product.rating?.toFixed(1) || 'N/A'}</td>
@@ -494,7 +523,7 @@ export default function DashboardPenjual() {
             ${pdfData.map((product, index) => `
               <tr>
                 <td>${index + 1}</td>
-                <td>${product.name_id}</td>
+                <td>${product.name}</td>
                 <td>${product.category}</td>
                 <td>${formatCurrency(product.price)}</td>
                 <td>${product.stock}</td>
@@ -521,7 +550,7 @@ export default function DashboardPenjual() {
             ${pdfData.map((product, index) => `
               <tr>
                 <td>${index + 1}</td>
-                <td>${product.name_id}</td>
+                <td>${product.name}</td>
                 <td>${product.category}</td>
                 <td>${formatCurrency(product.price)}</td>
                 <td>${product.stock}</td>
@@ -564,6 +593,10 @@ export default function DashboardPenjual() {
   const handleDeleteProduct = async (productId: number) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
       try {
+        // First, get the product to get the image URL
+        const productToDelete = products.find(p => p.id === productId);
+        
+        // Delete product from database
         const { error } = await supabase
           .from('products')
           .delete()
@@ -592,10 +625,21 @@ export default function DashboardPenjual() {
     if (!editingProduct || !currentSeller) return;
 
     try {
+      setUploading(true);
+      let imageUrl = editingProduct.image_url;
+
+      // Upload new image if exists
+      if (imageFile) {
+        const uploadedUrl = await uploadImage(imageFile);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        }
+      }
+
       const { error } = await supabase
         .from('products')
         .update({
-          name_id: editingProduct.name_id,
+          name: editingProduct.name,
           category: editingProduct.category,
           price: editingProduct.price,
           stock: editingProduct.stock,
@@ -603,7 +647,7 @@ export default function DashboardPenjual() {
           condition: editingProduct.condition,
           province: editingProduct.province,
           city: editingProduct.city,
-          image_url: editingProduct.image_url,
+          image_url: imageUrl,
         })
         .eq('id', editingProduct.id)
         .eq('seller_id', currentSeller.id);
@@ -612,17 +656,20 @@ export default function DashboardPenjual() {
 
       // Update local state
       const newProducts = products.map(p => 
-        p.id === editingProduct.id ? editingProduct : p
+        p.id === editingProduct.id ? {...editingProduct, image_url: imageUrl} : p
       );
       setProducts(newProducts);
       
       setEditingProduct(null);
+      setImageFile(null);
       setImagePreview(null);
       setActiveView('kelola-produk');
       alert('Produk berhasil diperbarui!');
     } catch (error) {
       console.error('Error updating product:', error);
       alert('Gagal memperbarui produk');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -640,19 +687,8 @@ export default function DashboardPenjual() {
       }
 
       const imageUrl = URL.createObjectURL(file);
-      
-      if (isEdit && editingProduct) {
-        setEditingProduct({
-          ...editingProduct,
-          image_url: imageUrl
-        });
-      } else {
-        setImagePreview(imageUrl);
-        setNewProduct({
-          ...newProduct,
-          image_url: imageUrl
-        });
-      }
+      setImageFile(file);
+      setImagePreview(imageUrl);
     }
   };
 
@@ -662,24 +698,35 @@ export default function DashboardPenjual() {
       return;
     }
 
-    if (!newProduct.name_id || !newProduct.category || !newProduct.price || !newProduct.stock) {
+    if (!newProduct.name || !newProduct.category || !newProduct.price || !newProduct.stock) {
       alert('Harap isi semua field yang diperlukan!');
       return;
     }
 
     try {
+      setUploading(true);
+      let imageUrl = newProduct.image_url;
+
+      // Upload image if exists
+      if (imageFile) {
+        const uploadedUrl = await uploadImage(imageFile);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        }
+      }
+
       const { data, error } = await supabase
         .from('products')
         .insert({
-          name_id: newProduct.name_id,
+          name: newProduct.name,
           category: newProduct.category,
           price: Number(newProduct.price),
           stock: Number(newProduct.stock),
           description: newProduct.description,
-          condition: newProduct.condition || "Baru",
+          condition: newProduct.condition || "baru",
           province: newProduct.province || currentSeller.province,
           city: newProduct.city || currentSeller.city,
-          image_url: newProduct.image_url,
+          image_url: imageUrl,
           seller_id: currentSeller.id,
           created_at: new Date().toISOString()
         })
@@ -692,30 +739,33 @@ export default function DashboardPenjual() {
       const newProductObj: Product = {
         ...data,
         sold: generateRandomSold(),
-        rating: generateRandomRating(),
-        name: data.name_id
+        rating: generateRandomRating()
       };
 
       const newProducts = [newProductObj, ...products];
       setProducts(newProducts);
       
+      // Reset form
       setNewProduct({ 
-        name_id: "", 
+        name: "", 
         category: "", 
         price: "", 
         stock: "",
         description: "",
-        condition: "Baru",
+        condition: "baru",
         province: "",
         city: "",
         image_url: "" 
       });
+      setImageFile(null);
       setImagePreview(null);
       setActiveView('kelola-produk');
       alert('Produk berhasil ditambahkan!');
     } catch (error) {
       console.error('Error adding product:', error);
       alert('Gagal menambahkan produk');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -767,7 +817,7 @@ export default function DashboardPenjual() {
     </div>
   );
 
-const renderDashboard = () => {
+  const renderDashboard = () => {
     const displayedMonths = getDisplayedMonths();
     
     return (
@@ -985,7 +1035,7 @@ const renderDashboard = () => {
                   .map((product) => (
                     <tr key={product.id} className="hover:bg-[var(--color-beige)]">
                       <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)] font-medium">
-                        {product.name_id}
+                        {product.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">
                         <span className="px-2 py-1 text-xs bg-[var(--color-sky-blue)] text-[var(--color-navy)] rounded-full">
@@ -1093,7 +1143,7 @@ const renderDashboard = () => {
                 case 'low-stock':
                   dataToShow = [...products]
                     .filter(product => product.stock < 2)
-                    .sort((a, b) => a.category.localeCompare(b.category) || a.name_id.localeCompare(b.name_id));
+                    .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
                   break;
                 default:
                   dataToShow = products;
@@ -1105,12 +1155,11 @@ const renderDashboard = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden">
                       {product.image_url ? (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-300 flex items-center justify-center text-blue-800 text-xs">
-                          <div className="text-center">
-                            <div className="text-lg">📷</div>
-                            <div className="text-[10px] mt-1">Image</div>
-                          </div>
-                        </div>
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <div className="w-full h-full bg-gray-300 flex items-center justify-center">
                           <span className="text-gray-500 text-xs">No Image</span>
@@ -1118,7 +1167,7 @@ const renderDashboard = () => {
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.name_id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.category}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{formatCurrency(product.price)}</td>
                   {selectedReport === 'stock-by-stock' && (
@@ -1207,7 +1256,6 @@ const renderDashboard = () => {
     </div>
   );
 
-  // Update renderKelolaProduk untuk menggunakan data dari database
   const renderKelolaProduk = () => (
     <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6">
       <div className="flex items-center justify-between mb-6">
@@ -1252,12 +1300,11 @@ const renderDashboard = () => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden">
                     {product.image_url ? (
-                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-300 flex items-center justify-center text-blue-800">
-                        <div className="text-center">
-                          <div className="text-lg">📷</div>
-                          <div className="text-[10px] mt-1">Image</div>
-                        </div>
-                      </div>
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <div className="w-full h-full bg-gray-300 flex items-center justify-center">
                         <span className="text-gray-500">No Image</span>
@@ -1266,7 +1313,7 @@ const renderDashboard = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)] font-medium">
-                  {product.name_id}
+                  {product.name}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">
                   <span className="px-2 py-1 text-xs bg-[var(--color-sky-blue)] text-[var(--color-navy)] rounded-full">
@@ -1289,11 +1336,11 @@ const renderDashboard = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    product.condition === 'Baru' 
+                    product.condition === 'baru' 
                       ? 'bg-green-100 text-green-800' 
                       : 'bg-blue-100 text-blue-800'
                   }`}>
-                    {product.condition}
+                    {product.condition === 'baru' ? 'Baru' : 'Bekas'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -1313,7 +1360,7 @@ const renderDashboard = () => {
                   <button
                     onClick={() => handleEditProduct(product)}
                     className="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    aria-label={`Edit produk ${product.name_id}`}
+                    aria-label={`Edit produk ${product.name}`}
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1323,7 +1370,7 @@ const renderDashboard = () => {
                   <button
                     onClick={() => handleDeleteProduct(product.id)}
                     className="inline-flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
-                    aria-label={`Hapus produk ${product.name_id}`}
+                    aria-label={`Hapus produk ${product.name}`}
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 011.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1367,7 +1414,6 @@ const renderDashboard = () => {
     </div>
   );
 
-  // Update renderTambahProduk untuk form tambah produk
   const renderTambahProduk = () => (
     <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 max-w-2xl mx-auto">
       <h2 className="text-xl font-semibold text-[var(--color-navy)] mb-6">Tambah Produk Baru</h2>
@@ -1385,11 +1431,12 @@ const renderDashboard = () => {
               aria-label="Upload gambar produk"
             >
               {imagePreview ? (
-                <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-2xl">📷</div>
-                    <div className="text-xs mt-2">Preview Image</div>
-                  </div>
+                <div className="w-full h-full rounded-lg overflow-hidden">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               ) : (
                 <>
@@ -1423,8 +1470,8 @@ const renderDashboard = () => {
             <input
               id="product-name"
               type="text"
-              value={newProduct.name_id}
-              onChange={(e) => setNewProduct({...newProduct, name_id: e.target.value})}
+              value={newProduct.name}
+              onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
               className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
               placeholder="Masukkan nama produk"
               required
@@ -1449,6 +1496,11 @@ const renderDashboard = () => {
               <option value="Aksesoris">Aksesoris</option>
               <option value="Elektronik">Elektronik</option>
               <option value="Makanan">Makanan</option>
+              <option value="Alat Rumah Tangga">Alat Rumah Tangga</option>
+              <option value="Kesehatan">Kesehatan</option>
+              <option value="Olahraga">Olahraga</option>
+              <option value="Hobi">Hobi</option>
+              <option value="Lainnya">Lainnya</option>
             </select>
           </div>
 
@@ -1494,8 +1546,8 @@ const renderDashboard = () => {
               onChange={(e) => setNewProduct({...newProduct, condition: e.target.value})}
               className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
             >
-              <option value="Baru">Baru</option>
-              <option value="Bekas">Bekas</option>
+              <option value="baru">Baru</option>
+              <option value="bekas">Bekas</option>
             </select>
           </div>
 
@@ -1518,6 +1570,7 @@ const renderDashboard = () => {
           <button
             onClick={() => {
               setActiveView('kelola-produk');
+              setImageFile(null);
               setImagePreview(null);
             }}
             className="px-4 py-2 border border-[var(--color-sky-blue)] text-[var(--color-navy)] rounded-lg hover:bg-[var(--color-sky-blue)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
@@ -1526,9 +1579,10 @@ const renderDashboard = () => {
           </button>
           <button
             onClick={handleAddProduct}
-            className="bg-[var(--color-teal)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-navy)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+            disabled={uploading}
+            className="bg-[var(--color-teal)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-navy)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Simpan Produk
+            {uploading ? 'Menyimpan...' : 'Simpan Produk'}
           </button>
         </div>
       </div>
@@ -1554,12 +1608,30 @@ const renderDashboard = () => {
                 onClick={() => document.getElementById('edit-image-upload')?.click()}
                 aria-label="Ganti gambar produk"
               >
-                <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-2xl">📷</div>
-                    <div className="text-xs mt-2">Product Image</div>
+                {imagePreview ? (
+                  <div className="w-full h-full rounded-lg overflow-hidden">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                </div>
+                ) : editingProduct.image_url ? (
+                  <div className="w-full h-full rounded-lg overflow-hidden">
+                    <img
+                      src={editingProduct.image_url}
+                      alt={editingProduct.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <svg className="w-8 h-8 text-[var(--color-sky-blue)] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-xs text-[var(--color-sky-blue)]">Upload Gambar</span>
+                  </>
+                )}
               </button>
               <div>
                 <p className="text-sm text-[var(--color-navy)] mb-2">Klik untuk mengganti gambar</p>
@@ -1606,6 +1678,11 @@ const renderDashboard = () => {
                 <option value="Aksesoris">Aksesoris</option>
                 <option value="Elektronik">Elektronik</option>
                 <option value="Makanan">Makanan</option>
+                <option value="Alat Rumah Tangga">Alat Rumah Tangga</option>
+                <option value="Kesehatan">Kesehatan</option>
+                <option value="Olahraga">Olahraga</option>
+                <option value="Hobi">Hobi</option>
+                <option value="Lainnya">Lainnya</option>
               </select>
             </div>
 
@@ -1636,12 +1713,42 @@ const renderDashboard = () => {
                 min="0"
               />
             </div>
+
+            <div>
+              <label htmlFor="edit-product-condition" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
+                Kondisi
+              </label>
+              <select
+                id="edit-product-condition"
+                value={editingProduct.condition}
+                onChange={(e) => setEditingProduct({...editingProduct, condition: e.target.value})}
+                className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+              >
+                <option value="baru">Baru</option>
+                <option value="bekas">Bekas</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="edit-product-description" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
+                Deskripsi
+              </label>
+              <textarea
+                id="edit-product-description"
+                value={editingProduct.description}
+                onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})}
+                className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+                rows={3}
+              />
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
             <button
               onClick={() => {
                 setEditingProduct(null);
+                setImageFile(null);
+                setImagePreview(null);
                 setActiveView('kelola-produk');
               }}
               className="px-4 py-2 border border-[var(--color-sky-blue)] text-[var(--color-navy)] rounded-lg hover:bg-[var(--color-sky-blue)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
@@ -1650,9 +1757,10 @@ const renderDashboard = () => {
             </button>
             <button
               onClick={handleSaveEdit}
-              className="bg-[var(--color-teal)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-navy)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+              disabled={uploading}
+              className="bg-[var(--color-teal)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-navy)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Simpan Perubahan
+              {uploading ? 'Menyimpan...' : 'Simpan Perubahan'}
             </button>
           </div>
         </div>
@@ -1690,7 +1798,7 @@ const renderDashboard = () => {
                   day: 'numeric',
                   month: 'long',
                   year: 'numeric'
-                })} oleh <strong>Penjual Toko Fashion XYZ</strong>
+                })} oleh <strong>{currentSeller?.store_name || "Penjual"}</strong>
               </p>
             </div>
             
