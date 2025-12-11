@@ -1,4 +1,3 @@
-// app/api/admin/laporan/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -35,19 +34,17 @@ const PROVINCES = [
 ];
 
 export async function GET(request: Request) {
-  console.log("🔍 GET request received for admin laporan");
+  console.log("🔍 [API] GET request received for admin laporan");
   
   try {
     const { searchParams } = new URL(request.url);
     const reportType = searchParams.get('type');
-    const startDate = searchParams.get('start');
-    const endDate = searchParams.get('end');
     const province = searchParams.get('province');
 
-    console.log("📊 Query params:", { reportType, startDate, endDate, province });
+    console.log("📊 [API] Query params:", { reportType, province });
 
     if (!reportType) {
-      console.log("❌ Missing report type");
+      console.log("❌ [API] Missing report type");
       return NextResponse.json(
         { 
           success: false, 
@@ -58,14 +55,14 @@ export async function GET(request: Request) {
     }
 
     // Test connection
-    console.log("🔄 Testing Supabase connection...");
+    console.log("🔄 [API] Testing Supabase connection...");
     const { data: testData, error: testError } = await supabase
       .from("sellers")
       .select("id")
       .limit(1);
 
     if (testError) {
-      console.error("❌ Supabase connection error:", testError);
+      console.error("❌ [API] Supabase connection error:", testError);
       return NextResponse.json(
         { 
           success: false, 
@@ -76,21 +73,27 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log("✅ Supabase connection successful");
+    console.log("✅ [API] Supabase connection successful");
 
-    let data;
-    let error;
+    let resultData: any[] = [];
+    let queryError: any = null;
 
-    console.log(`🔄 Processing report type: ${reportType}`);
+    console.log(`🔄 [API] Processing report type: ${reportType}`);
     
     if (reportType === 'seller-status') {
-      ({ data, error } = await getSellerStatusReport(startDate, endDate));
+      const result = await getSellerStatusReport();
+      resultData = result.data;
+      queryError = result.error;
     } else if (reportType === 'sellers-by-province') {
-      ({ data, error } = await getSellersByProvinceReport(province, startDate, endDate));
+      const result = await getSellersByProvinceReport(province);
+      resultData = result.data;
+      queryError = result.error;
     } else if (reportType === 'products-rating') {
-      ({ data, error } = await getProductsRatingReport(startDate, endDate));
+      const result = await getProductsRatingReport();
+      resultData = result.data;
+      queryError = result.error;
     } else {
-      console.log(`❌ Invalid report type: ${reportType}`);
+      console.log(`❌ [API] Invalid report type: ${reportType}`);
       return NextResponse.json(
         { 
           success: false, 
@@ -100,32 +103,32 @@ export async function GET(request: Request) {
       );
     }
 
-    if (error) {
-      console.error("❌ Query error:", error);
+    if (queryError) {
+      console.error("❌ [API] Query error:", queryError);
       return NextResponse.json(
         { 
           success: false, 
-          message: `Query error: ${error.message}` 
+          message: `Query error: ${queryError.message}` 
         },
         { status: 500 }
       );
     }
 
-    console.log(`✅ Report generated successfully, ${data?.length || 0} records`);
+    console.log(`✅ [API] Report generated successfully, ${resultData?.length || 0} records`);
 
     return NextResponse.json({
       success: true,
       message: "Data berhasil diambil",
-      data: data || [],
+      data: resultData || [],
       metadata: {
         reportType,
-        totalRecords: data?.length || 0,
-        filters: { startDate, endDate, province }
+        totalRecords: resultData?.length || 0,
+        filters: { province }
       }
     });
 
   } catch (error: any) {
-    console.error("❌ Unexpected error in GET:", error);
+    console.error("❌ [API] Unexpected error in GET:", error);
     return NextResponse.json(
       { 
         success: false, 
@@ -136,12 +139,12 @@ export async function GET(request: Request) {
   }
 }
 
-async function getSellerStatusReport(startDate?: string | null, endDate?: string | null) {
-  console.log("📋 Getting seller status report - SESUAI SCHEMA DATABASE");
+async function getSellerStatusReport() {
+  console.log("📋 [API] Getting seller status report");
   
   try {
-    // Query sellers dengan join ke users untuk mendapatkan email user
-    let query = supabase
+    // Query sellers langsung (tanpa join users dulu untuk testing)
+    const query = supabase
       .from("sellers")
       .select(`
         id,
@@ -154,30 +157,81 @@ async function getSellerStatusReport(startDate?: string | null, endDate?: string
         verified,
         verification_status,
         created_at,
-        is_active,
-        users!inner (
-          email,
-          name
-        )
-      `);
+        is_active
+      `)
+      .order("created_at", { ascending: false });
 
-    if (startDate) {
-      console.log(`📅 Filter start date: ${startDate}`);
-      query = query.gte("created_at", startDate);
+    const queryResult = await query;
+
+    if (queryResult.error) {
+      console.error("❌ [API] Query error (sellers):", queryResult.error);
+      
+      // Jika error karena join, coba query tanpa join
+      console.log("⚠️ [API] Trying simple query without join...");
+      const simpleQuery = await supabase
+        .from("sellers")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      
+      if (simpleQuery.error) {
+        return { data: [], error: simpleQuery.error };
+      }
+      
+      // Gunakan data dari simpleQuery
+      const data = simpleQuery.data;
+      console.log(`✅ [API] Found ${data?.length || 0} sellers from simple query`);
+
+      // Format data sesuai kebutuhan laporan
+      const formattedData = data?.map(seller => {
+        // Tentukan status berdasarkan verified, verification_status, dan is_active
+        let status = "Tidak Aktif";
+        
+        if (seller.is_active && seller.verified && seller.verification_status === 'accepted') {
+          status = "Aktif";
+        } else if (!seller.is_active) {
+          status = "Non-Aktif";
+        } else if (!seller.verified) {
+          status = "Belum Diverifikasi";
+        } else if (seller.verification_status === 'pending') {
+          status = "Menunggu Verifikasi";
+        } else if (seller.verification_status === 'rejected') {
+          status = "Ditolak";
+        }
+        
+        // Coba ambil data user jika ada relasi
+        let userEmail = seller.pic_email || '-';
+        let userName = seller.pic_name || '-';
+        
+        return {
+          id: seller.id,
+          email: userEmail,
+          name: userName,
+          pic_name: seller.pic_name || '-',
+          store_name: seller.store_name || '-',
+          status: status,
+          verified: seller.verified,
+          verification_status: seller.verification_status,
+          is_active: seller.is_active,
+          province: seller.province,
+          city: seller.city,
+          created_at: seller.created_at,
+          // Untuk sorting: Aktif dulu, baru status lainnya
+          status_order: status === "Aktif" ? 1 : 
+                       status === "Menunggu Verifikasi" ? 2 :
+                       status === "Belum Diverifikasi" ? 3 :
+                       status === "Ditolak" ? 4 : 5
+        };
+      }) || [];
+
+      // Urutkan: Aktif dulu, kemudian berdasarkan status_order
+      formattedData.sort((a, b) => a.status_order - b.status_order);
+
+      return { data: formattedData, error: null };
     }
-    if (endDate) {
-      console.log(`📅 Filter end date: ${endDate}`);
-      query = query.lte("created_at", endDate);
-    }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("❌ Query error (sellers):", error);
-      return { data: [], error };
-    }
-
-    console.log(`✅ Found ${data?.length || 0} sellers`);
+    const data = queryResult.data;
+    console.log(`✅ [API] Found ${data?.length || 0} sellers`);
 
     // Format data sesuai kebutuhan laporan
     const formattedData = data?.map(seller => {
@@ -196,10 +250,14 @@ async function getSellerStatusReport(startDate?: string | null, endDate?: string
         status = "Ditolak";
       }
       
+      // Coba ambil data user jika ada relasi
+      let userEmail = seller.pic_email || '-';
+      let userName = seller.pic_name || '-';
+      
       return {
         id: seller.id,
-        email: seller.users?.email || seller.pic_email || '-',
-        name: seller.users?.name || seller.pic_name || '-',
+        email: userEmail,
+        name: userName,
         pic_name: seller.pic_name || '-',
         store_name: seller.store_name || '-',
         status: status,
@@ -223,23 +281,23 @@ async function getSellerStatusReport(startDate?: string | null, endDate?: string
     return { data: formattedData, error: null };
     
   } catch (error: any) {
-    console.error("❌ Error in getSellerStatusReport:", error);
+    console.error("❌ [API] Error in getSellerStatusReport:", error);
     return { data: [], error };
   }
 }
 
-async function getSellersByProvinceReport(provinceId?: string | null, startDate?: string | null, endDate?: string | null) {
-  console.log("📋 Getting sellers by province report - SESUAI SCHEMA DATABASE");
+async function getSellersByProvinceReport(provinceId?: string | null) {
+  console.log("📋 [API] Getting sellers by province report");
   
   try {
     let provinceName;
     if (provinceId) {
       const prov = PROVINCES.find(p => p.id === provinceId);
       provinceName = prov ? prov.name : provinceId;
-      console.log(`📍 Province filter: ${provinceName} (ID: ${provinceId})`);
+      console.log(`📍 [API] Province filter: ${provinceName} (ID: ${provinceId})`);
     }
 
-    // Query sellers berdasarkan provinsi
+    // Query sellers berdasarkan provinsi (tanpa join users)
     let query = supabase
       .from("sellers")
       .select(`
@@ -251,38 +309,66 @@ async function getSellersByProvinceReport(provinceId?: string | null, startDate?
         province,
         city,
         verified,
-        created_at,
-        users!inner (
-          name
-        )
-      `)
-      .order('province', { ascending: true });
+        created_at
+      `);
 
     if (provinceName) {
       query = query.eq("province", provinceName);
     }
-    if (startDate) {
-      query = query.gte("created_at", startDate);
-    }
-    if (endDate) {
-      query = query.lte("created_at", endDate);
-    }
 
-    const { data, error } = await query;
+    const queryResult = await query;
     
-    if (error) {
-      console.error("❌ Query error:", error);
-      return { data: [], error };
+    if (queryResult.error) {
+      console.error("❌ [API] Query error:", queryResult.error);
+      
+      // Coba query sederhana
+      console.log("⚠️ [API] Trying simple query...");
+      const simpleQuery = await supabase
+        .from("sellers")
+        .select("*")
+        .order("province", { ascending: true })
+        .limit(50);
+      
+      if (simpleQuery.error) {
+        return { data: [], error: simpleQuery.error };
+      }
+      
+      // Gunakan data dari simpleQuery
+      const data = simpleQuery.data;
+      console.log(`✅ [API] Found ${data?.length || 0} sellers by province from simple query`);
+      
+      // Format data sesuai kebutuhan laporan
+      const formattedData = data?.map(seller => {
+        return {
+          id: seller.id,
+          store_name: seller.store_name || '-',
+          name: seller.pic_name || '-',
+          pic_name: seller.pic_name || '-',
+          email: seller.pic_email || '-',
+          phone: seller.pic_phone || '-',
+          province: seller.province || '-',
+          city: seller.city || '-',
+          verified: seller.verified,
+          created_at: seller.created_at,
+          province_name: seller.province || 'ZZZ' // Untuk sorting
+        };
+      }) || [];
+
+      // Sort by province
+      formattedData.sort((a, b) => a.province_name.localeCompare(b.province_name));
+
+      return { data: formattedData, error: null };
     }
 
-    console.log(`✅ Found ${data?.length || 0} sellers by province`);
+    const data = queryResult.data;
+    console.log(`✅ [API] Found ${data?.length || 0} sellers by province`);
     
     // Format data sesuai kebutuhan laporan
     const formattedData = data?.map(seller => {
       return {
         id: seller.id,
         store_name: seller.store_name || '-',
-        name: seller.users?.name || seller.pic_name || '-',
+        name: seller.pic_name || '-',
         pic_name: seller.pic_name || '-',
         email: seller.pic_email || '-',
         phone: seller.pic_phone || '-',
@@ -300,17 +386,17 @@ async function getSellersByProvinceReport(provinceId?: string | null, startDate?
     return { data: formattedData, error: null };
     
   } catch (error: any) {
-    console.error("❌ Error in getSellersByProvinceReport:", error);
+    console.error("❌ [API] Error in getSellersByProvinceReport:", error);
     return { data: [], error };
   }
 }
 
-async function getProductsRatingReport(startDate?: string | null, endDate?: string | null) {
-  console.log("📋 Getting products rating report - SESUAI SCHEMA DATABASE");
+async function getProductsRatingReport() {
+  console.log("📋 [API] Getting products rating report");
   
   try {
-    // Query products dengan join ke sellers dan reviews untuk rating
-    let query = supabase
+    // Query products saja dulu (tanpa join yang kompleks)
+    const query = supabase
       .from("products")
       .select(`
         id,
@@ -322,44 +408,68 @@ async function getProductsRatingReport(startDate?: string | null, endDate?: stri
         province,
         city,
         created_at,
-        sellers!inner (
-          store_name,
-          province,
-          city
-        ),
-        reviews (
-          rating,
-          user_province,
-          created_at
-        )
+        seller_id
       `)
-      .order('created_at', { ascending: false });
-
-    if (startDate) {
-      query = query.gte("products.created_at", startDate);
-    }
-    if (endDate) {
-      query = query.lte("products.created_at", endDate);
-    }
+      .order("created_at", { ascending: false });
 
     const { data: products, error: productsError } = await query;
     
     if (productsError) {
-      console.error("❌ Products query error:", productsError);
+      console.error("❌ [API] Products query error:", productsError);
       return { data: [], error: productsError };
     }
 
-    console.log(`✅ Found ${products?.length || 0} products`);
+    console.log(`✅ [API] Found ${products?.length || 0} products`);
+    
+    // Ambil data sellers untuk mendapatkan nama toko
+    const sellerIds = products?.map(p => p.seller_id).filter(id => id) || [];
+    let sellersMap = new Map();
+    
+    if (sellerIds.length > 0) {
+      const { data: sellersData, error: sellersError } = await supabase
+        .from("sellers")
+        .select("id, store_name, province")
+        .in("id", sellerIds);
+      
+      if (!sellersError && sellersData) {
+        sellersData.forEach(seller => {
+          sellersMap.set(seller.id, seller);
+        });
+      }
+    }
+    
+    // Ambil data reviews untuk rating
+    const productIds = products?.map(p => p.id).filter(id => id) || [];
+    let reviewsMap = new Map();
+    
+    if (productIds.length > 0) {
+      const { data: reviewsData, error: reviewsError } = await supabase
+        .from("reviews")
+        .select("product_id, rating, user_province")
+        .in("product_id", productIds);
+      
+      if (!reviewsError && reviewsData) {
+        reviewsData.forEach(review => {
+          if (!reviewsMap.has(review.product_id)) {
+            reviewsMap.set(review.product_id, []);
+          }
+          reviewsMap.get(review.product_id).push(review);
+        });
+      }
+    }
     
     // Format data dengan menghitung rating dari reviews
     const productsWithRating = products?.map(product => {
+      const productReviews = reviewsMap.get(product.id) || [];
+      const sellerInfo = sellersMap.get(product.seller_id);
+      
       // Hitung rating rata-rata dari reviews
       let averageRating = 0;
       let totalReviews = 0;
-      let reviewProvince = product.province || product.sellers?.province || 'Tidak diketahui';
+      let reviewProvince = product.province || (sellerInfo?.province) || 'Tidak diketahui';
       
-      if (product.reviews && product.reviews.length > 0) {
-        const totalRating = product.reviews.reduce((sum: number, review: any) => {
+      if (productReviews.length > 0) {
+        const totalRating = productReviews.reduce((sum: number, review: any) => {
           if (review.rating) {
             // Ambil provinsi dari review pertama untuk laporan
             if (totalReviews === 0 && review.user_province) {
@@ -385,9 +495,9 @@ async function getProductsRatingReport(startDate?: string | null, endDate?: stri
         price: product.price || 0,
         rating: parseFloat(averageRating.toFixed(1)),
         total_reviews: totalReviews,
-        store_name: product.sellers?.store_name || 'Toko tidak diketahui',
+        store_name: sellerInfo?.store_name || 'Toko tidak diketahui',
         province: reviewProvince, // Provinsi dari pemberi rating (sesuai SRS)
-        seller_province: product.sellers?.province || product.province || 'Tidak diketahui',
+        seller_province: sellerInfo?.province || product.province || 'Tidak diketahui',
         condition: product.condition || '-',
         stock: product.stock || 0,
         created_at: product.created_at
@@ -397,41 +507,41 @@ async function getProductsRatingReport(startDate?: string | null, endDate?: stri
     // Sort by rating descending
     productsWithRating.sort((a, b) => b.rating - a.rating);
     
-    console.log(`✅ Processed ${productsWithRating.length} products with ratings`);
+    console.log(`✅ [API] Processed ${productsWithRating.length} products with ratings`);
     
     return { data: productsWithRating, error: null };
     
   } catch (error: any) {
-    console.error("❌ Error in getProductsRatingReport:", error);
+    console.error("❌ [API] Error in getProductsRatingReport:", error);
     return { data: [], error };
   }
 }
 
 export async function POST(request: Request) {
-  console.log("🔍 POST request received for admin laporan");
+  console.log("🔍 [API] POST request received for admin laporan");
   
   try {
     const body = await request.json();
     const { action } = body;
     
-    console.log(`📝 POST action: ${action}`);
+    console.log(`📝 [API] POST action: ${action}`);
 
     if (action === 'get-provinces') {
-      console.log("✅ Returning provinces data");
+      console.log("✅ [API] Returning provinces data");
       return NextResponse.json({
         success: true,
         data: PROVINCES
       });
     }
 
-    console.log(`❌ Invalid action: ${action}`);
+    console.log(`❌ [API] Invalid action: ${action}`);
     return NextResponse.json(
       { success: false, message: "Aksi tidak valid" },
       { status: 400 }
     );
 
   } catch (error: any) {
-    console.error("❌ Error in POST:", error);
+    console.error("❌ [API] Error in POST:", error);
     return NextResponse.json(
       { 
         success: false, 
