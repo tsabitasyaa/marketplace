@@ -7,17 +7,50 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   AreaChart, Area, Cell
 } from "recharts";
+import { supabase } from "@/lib/supabase";
 
+// Update interface sesuai dengan database
 interface Product {
   id: number;
-  name: string;
+  name_id: string;
   category: string;
   price: number;
   stock: number;
-  sold: number;
-  rating: number;
-  image: string;
-  createdAt: string;
+  description: string;
+  condition: string;
+  province: string;
+  city: string;
+  image_url: string;
+  created_at: string;
+  // Tambahan untuk frontend
+  sold?: number;
+  rating?: number;
+  name?: string;
+}
+
+interface Seller {
+  id: string;
+  store_name: string;
+  description: string;
+  pic_name: string;
+  pic_phone: string;
+  pic_email: string;
+  pic_address: string;
+  rt: string;
+  rw: string;
+  kelumbar: string;
+  city: string;
+  province: string;
+  pic_kip: string;
+  pic_photo_url: string;
+  pic_kip_file_url: string;
+  verified: string;
+  verification_status: string;
+  created_at: string;
+  it_active: string;
+  lecomatan: string;
+  user_id: string;
+  verification_potes: string;
 }
 
 interface DashboardStats {
@@ -57,6 +90,7 @@ type ReportType = 'stock-by-stock' | 'stock-by-rating' | 'low-stock';
 export default function DashboardPenjual() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [currentSeller, setCurrentSeller] = useState<Seller | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalSold: 0,
@@ -76,11 +110,15 @@ export default function DashboardPenjual() {
   const [selectedReport, setSelectedReport] = useState<ReportType>('stock-by-stock');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [newProduct, setNewProduct] = useState({
-    name: "",
+    name_id: "",
     category: "",
     price: "",
     stock: "",
-    image: "",
+    description: "",
+    condition: "Baru",
+    province: "",
+    city: "",
+    image_url: "",
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
@@ -89,7 +127,7 @@ export default function DashboardPenjual() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [currentMonthIndex, setCurrentMonthIndex] = useState(0);
 
-  // Dummy data generator
+  // Dummy data generator untuk data yang tidak ada di database
   const generateRandomSold = useCallback(() => Math.floor(Math.random() * 50) + 10, []);
   const generateRandomRating = useCallback(() => parseFloat((3.5 + Math.random() * 1.5).toFixed(1)), []);
   const generateRandomVisitors = useCallback(() => Math.floor(Math.random() * 200) + 100, []);
@@ -99,143 +137,76 @@ export default function DashboardPenjual() {
   // Define COLORS inside useMemo to prevent unnecessary re-renders
   const COLORS = useMemo(() => ['#567C8D', '#2F4156', '#C8D9E6', '#94A9C9', '#6B8BA4', '#3A506B'], []);
 
-  // Dummy images array
-  const dummyImages = useMemo(() => [
-    "/images/products/shoes1.jpg",
-    "/images/products/shirt1.jpg", 
-    "/images/products/jeans1.jpg",
-    "/images/products/shoes2.jpg",
-    "/images/products/bag1.jpg",
-    "/images/products/watch1.jpg",
-    "/images/products/shirt2.jpg",
-    "/images/products/hat1.jpg",
-    "/images/products/wallet1.jpg",
-    "/images/products/shoes3.jpg",
-    "/images/products/tshirt1.jpg",
-    "/images/products/jacket1.jpg"
-  ], []);
+  // Fetch current seller from session
+  useEffect(() => {
+    const fetchCurrentSeller = async () => {
+      try {
+        // Ambil session dari Supabase
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user?.id) {
+          router.push('/penjual/login');
+          return;
+        }
 
-  // Function to get random dummy image
-  const getRandomDummyImage = useCallback(() => {
-    const randomIndex = Math.floor(Math.random() * dummyImages.length);
-    return dummyImages[randomIndex];
-  }, [dummyImages]);
+        // Fetch seller data berdasarkan user_id
+        const { data: sellerData, error: sellerError } = await supabase
+          .from('sellers')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
 
-  // Initialize mock products
-  const getMockProducts = useCallback((): Product[] => {
-    return [
-      {
-        id: 1,
-        name: "Sepatu Running Premium",
-        category: "Sepatu",
-        price: 250000,
-        stock: 15,
-        sold: 42,
-        rating: 4.7,
-        image: "/images/products/shoes1.jpg",
-        createdAt: "2024-01-15"
-      },
-      {
-        id: 2,
-        name: "Baju Kaos Cotton Combed",
-        category: "Pakaian",
-        price: 75000,
-        stock: 15,
-        sold: 28,
-        rating: 4.5,
-        image: "/images/products/shirt1.jpg",
-        createdAt: "2024-01-20"
-      },
-      {
-        id: 3,
-        name: "Celana Jeans Slim Fit",
-        category: "Pakaian",
-        price: 250000,
-        stock: 3,
-        sold: 15,
-        rating: 4.2,
-        image: "/images/products/jeans1.jpg",
-        createdAt: "2024-02-05"
-      },
-      {
-        id: 4,
-        name: "Sepatu Sneakers Casual",
-        category: "Sepatu",
-        price: 350000,
-        stock: 8,
-        sold: 38,
-        rating: 4.8,
-        image: "/images/products/shoes2.jpg",
-        createdAt: "2024-02-10"
-      },
-      {
-        id: 5,
-        name: "Tas Ransel Outdoor",
-        category: "Aksesoris",
-        price: 180000,
-        stock: 1,
-        sold: 12,
-        rating: 4.0,
-        image: "/images/products/bag1.jpg",
-        createdAt: "2024-02-15"
-      },
-      {
-        id: 6,
-        name: "Jam Tangan Digital",
-        category: "Aksesoris",
-        price: 120000,
-        stock: 12,
-        sold: 25,
-        rating: 4.7,
-        image: "/images/products/watch1.jpg",
-        createdAt: "2024-03-01"
-      },
-      {
-        id: 7,
-        name: "Kemeja Flanel",
-        category: "Pakaian",
-        price: 189000,
-        stock: 6,
-        sold: 18,
-        rating: 4.3,
-        image: "/images/products/shirt2.jpg",
-        createdAt: "2024-03-05"
-      },
-      {
-        id: 8,
-        name: "Topi Baseball",
-        category: "Aksesoris",
-        price: 65000,
-        stock: 20,
-        sold: 32,
-        rating: 4.1,
-        image: "/images/products/hat1.jpg",
-        createdAt: "2024-03-10"
-      },
-      {
-        id: 9,
-        name: "Dompet Kulit",
-        category: "Aksesoris",
-        price: 95000,
-        stock: 4,
-        sold: 21,
-        rating: 4.6,
-        image: "/images/products/wallet1.jpg",
-        createdAt: "2024-03-15"
-      },
-      {
-        id: 10,
-        name: "Sepatu Formal",
-        category: "Sepatu",
-        price: 450000,
-        stock: 7,
-        sold: 35,
-        rating: 4.9,
-        image: "/images/products/shoes3.jpg",
-        createdAt: "2024-03-20"
+        if (sellerError) {
+          console.error('Error fetching seller:', sellerError);
+          router.push('/penjual/login');
+          return;
+        }
+
+        setCurrentSeller(sellerData);
+        
+        // Fetch products for this seller
+        await fetchSellerProducts(sellerData.id);
+      } catch (error) {
+        console.error('Error fetching seller data:', error);
+        router.push('/penjual/login');
       }
-    ];
-  }, []);
+    };
+
+    fetchCurrentSeller();
+  }, [router]);
+
+  // Fetch products for specific seller
+  const fetchSellerProducts = async (sellerId: string) => {
+    try {
+      setIsLoading(true);
+      
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('seller_id', sellerId) // Asumsi ada kolom seller_id di tabel products
+        .order('created_at', { ascending: false });
+
+      if (productsError) {
+        console.error('Error fetching products:', productsError);
+        return;
+      }
+
+      // Tambahkan data dummy untuk sold dan rating (karena tidak ada di database)
+      const productsWithAdditionalData = productsData.map(product => ({
+        ...product,
+        sold: generateRandomSold(),
+        rating: generateRandomRating(),
+        name: product.name_id // Menggunakan name_id sebagai nama produk
+      })) as Product[];
+
+      setProducts(productsWithAdditionalData);
+      
+    } catch (error) {
+      console.error('Error loading products:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Generate all months data (12 months)
   const generateAllMonthsData = useCallback(() => {
@@ -263,41 +234,8 @@ export default function DashboardPenjual() {
   };
 
   useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setIsLoading(true);
-        const savedProducts = localStorage.getItem('dashboard_products');
-        
-        if (savedProducts) {
-          setProducts(JSON.parse(savedProducts));
-        } else {
-          const mockProducts = getMockProducts();
-          const productsWithSold = mockProducts.map(product => ({
-            ...product,
-            sold: generateRandomSold(),
-            createdAt: new Date().toISOString()
-          }));
-          setProducts(productsWithSold);
-        }
-      } catch (error) {
-        console.error('Error loading products:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadProducts();
-  }, [getMockProducts, generateRandomSold]);
-
-  useEffect(() => {
-    if (products.length > 0) {
-      localStorage.setItem('dashboard_products', JSON.stringify(products));
-    }
-  }, [products]);
-
-  useEffect(() => {
     const fetchDashboardData = async () => {
-      if (products.length === 0) return;
+      if (products.length === 0 || !currentSeller) return;
 
       try {
         setIsLoading(true);
@@ -332,9 +270,9 @@ export default function DashboardPenjual() {
         
         // Calculate statistics
         const lowStockProducts = products.filter(product => product.stock < 2).length;
-        const averageRating = products.reduce((acc, product) => acc + product.rating, 0) / totalProducts;
-        const totalRevenue = products.reduce((acc, product) => acc + (product.price * product.sold), 0);
-        const totalSold = products.reduce((acc, product) => acc + product.sold, 0);
+        const averageRating = products.reduce((acc, product) => acc + (product.rating || 0), 0) / totalProducts;
+        const totalRevenue = products.reduce((acc, product) => acc + (product.price * (product.sold || 0)), 0);
+        const totalSold = products.reduce((acc, product) => acc + (product.sold || 0), 0);
 
         const totalVisitors = monthlyData.reduce((acc, month) => acc + month.visitors, 0);
         const totalRatingComments = monthlyData.reduce((acc, month) => acc + month.comments, 0);
@@ -358,7 +296,7 @@ export default function DashboardPenjual() {
     };
 
     fetchDashboardData();
-  }, [products, generateAllMonthsData]);
+  }, [products, currentSeller, generateAllMonthsData]);
 
   const generateReport = () => {
     let dataToExport: Product[] = [];
@@ -372,14 +310,14 @@ export default function DashboardPenjual() {
         reportId = "SRS-MartPlace-12";
         break;
       case 'stock-by-rating':
-        dataToExport = [...products].sort((a, b) => b.rating - a.rating);
+        dataToExport = [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0));
         title = "Laporan Daftar Produk Berdasarkan Rating";
         reportId = "SRS-MartPlace-13";
         break;
       case 'low-stock':
         dataToExport = [...products]
           .filter(product => product.stock < 2)
-          .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+          .sort((a, b) => a.category.localeCompare(b.category) || a.name_id.localeCompare(b.name_id));
         title = "Laporan Daftar Produk Segera Dipesan";
         reportId = "SRS-MartPlace-14";
         break;
@@ -401,7 +339,7 @@ export default function DashboardPenjual() {
       year: 'numeric'
     });
 
-    const currentUser = "Penjual Toko Fashion XYZ";
+    const currentUser = currentSeller?.store_name || "Penjual";
 
     let htmlContent = `
       <!DOCTYPE html>
@@ -528,10 +466,10 @@ export default function DashboardPenjual() {
             ${pdfData.map((product, index) => `
               <tr>
                 <td>${index + 1}</td>
-                <td>${product.name}</td>
+                <td>${product.name_id}</td>
                 <td>${product.category}</td>
                 <td>${formatCurrency(product.price)}</td>
-                <td>${product.rating}</td>
+                <td>${product.rating?.toFixed(1) || 'N/A'}</td>
                 <td>${product.stock}</td>
               </tr>
             `).join('')}
@@ -556,11 +494,11 @@ export default function DashboardPenjual() {
             ${pdfData.map((product, index) => `
               <tr>
                 <td>${index + 1}</td>
-                <td>${product.name}</td>
+                <td>${product.name_id}</td>
                 <td>${product.category}</td>
                 <td>${formatCurrency(product.price)}</td>
                 <td>${product.stock}</td>
-                <td>${product.rating}</td>
+                <td>${product.rating?.toFixed(1) || 'N/A'}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -583,7 +521,7 @@ export default function DashboardPenjual() {
             ${pdfData.map((product, index) => `
               <tr>
                 <td>${index + 1}</td>
-                <td>${product.name}</td>
+                <td>${product.name_id}</td>
                 <td>${product.category}</td>
                 <td>${formatCurrency(product.price)}</td>
                 <td>${product.stock}</td>
@@ -623,32 +561,68 @@ export default function DashboardPenjual() {
     setShowPdfPreview(false);
   };
 
-  const handleDeleteProduct = (productId: number) => {
+  const handleDeleteProduct = async (productId: number) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
-      const newProducts = products.filter(product => product.id !== productId);
-      setProducts(newProducts);
-      localStorage.setItem('dashboard_products', JSON.stringify(newProducts));
-      alert('Produk berhasil dihapus!');
+      try {
+        const { error } = await supabase
+          .from('products')
+          .delete()
+          .eq('id', productId);
+
+        if (error) throw error;
+
+        // Update local state
+        const newProducts = products.filter(product => product.id !== productId);
+        setProducts(newProducts);
+        alert('Produk berhasil dihapus!');
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        alert('Gagal menghapus produk');
+      }
     }
   };
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct({...product});
-    setImagePreview(product.image);
+    setImagePreview(product.image_url);
     setActiveView('edit-produk');
   };
 
-  const handleSaveEdit = () => {
-    if (editingProduct) {
+  const handleSaveEdit = async () => {
+    if (!editingProduct || !currentSeller) return;
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          name_id: editingProduct.name_id,
+          category: editingProduct.category,
+          price: editingProduct.price,
+          stock: editingProduct.stock,
+          description: editingProduct.description,
+          condition: editingProduct.condition,
+          province: editingProduct.province,
+          city: editingProduct.city,
+          image_url: editingProduct.image_url,
+        })
+        .eq('id', editingProduct.id)
+        .eq('seller_id', currentSeller.id);
+
+      if (error) throw error;
+
+      // Update local state
       const newProducts = products.map(p => 
         p.id === editingProduct.id ? editingProduct : p
       );
       setProducts(newProducts);
-      localStorage.setItem('dashboard_products', JSON.stringify(newProducts));
+      
       setEditingProduct(null);
       setImagePreview(null);
       setActiveView('kelola-produk');
       alert('Produk berhasil diperbarui!');
+    } catch (error) {
+      console.error('Error updating product:', error);
+      alert('Gagal memperbarui produk');
     }
   };
 
@@ -670,50 +644,79 @@ export default function DashboardPenjual() {
       if (isEdit && editingProduct) {
         setEditingProduct({
           ...editingProduct,
-          image: imageUrl
+          image_url: imageUrl
         });
       } else {
         setImagePreview(imageUrl);
         setNewProduct({
           ...newProduct,
-          image: imageUrl
+          image_url: imageUrl
         });
       }
     }
   };
 
-  const handleAddProduct = () => {
-    if (!newProduct.name || !newProduct.category || !newProduct.price || !newProduct.stock) {
-      alert('Harap isi semua field!');
+  const handleAddProduct = async () => {
+    if (!currentSeller) {
+      alert('Seller tidak ditemukan');
       return;
     }
 
-    const newProductObj: Product = {
-      id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
-      name: newProduct.name,
-      category: newProduct.category,
-      price: Number(newProduct.price),
-      stock: Number(newProduct.stock),
-      sold: 0,
-      rating: generateRandomRating(),
-      image: newProduct.image || getRandomDummyImage(),
-      createdAt: new Date().toISOString()
-    };
+    if (!newProduct.name_id || !newProduct.category || !newProduct.price || !newProduct.stock) {
+      alert('Harap isi semua field yang diperlukan!');
+      return;
+    }
 
-    const newProducts = [newProductObj, ...products];
-    setProducts(newProducts);
-    localStorage.setItem('dashboard_products', JSON.stringify(newProducts));
-    
-    setNewProduct({ 
-      name: "", 
-      category: "", 
-      price: "", 
-      stock: "",
-      image: "" 
-    });
-    setImagePreview(null);
-    setActiveView('kelola-produk');
-    alert('Produk berhasil ditambahkan!');
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          name_id: newProduct.name_id,
+          category: newProduct.category,
+          price: Number(newProduct.price),
+          stock: Number(newProduct.stock),
+          description: newProduct.description,
+          condition: newProduct.condition || "Baru",
+          province: newProduct.province || currentSeller.province,
+          city: newProduct.city || currentSeller.city,
+          image_url: newProduct.image_url,
+          seller_id: currentSeller.id,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Tambahkan data dummy untuk frontend
+      const newProductObj: Product = {
+        ...data,
+        sold: generateRandomSold(),
+        rating: generateRandomRating(),
+        name: data.name_id
+      };
+
+      const newProducts = [newProductObj, ...products];
+      setProducts(newProducts);
+      
+      setNewProduct({ 
+        name_id: "", 
+        category: "", 
+        price: "", 
+        stock: "",
+        description: "",
+        condition: "Baru",
+        province: "",
+        city: "",
+        image_url: "" 
+      });
+      setImagePreview(null);
+      setActiveView('kelola-produk');
+      alert('Produk berhasil ditambahkan!');
+    } catch (error) {
+      console.error('Error adding product:', error);
+      alert('Gagal menambahkan produk');
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -728,10 +731,14 @@ export default function DashboardPenjual() {
     return new Intl.NumberFormat('id-ID').format(num);
   };
 
-  const handleLogout = () => {
-    // Hanya hapus session/login info, TIDAK hapus data produk
-    // localStorage.removeItem('dashboard_products'); // JANGAN hapus ini
-    router.push('/penjual/login');
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.push('/penjual/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
   };
 
   const renderLogoutConfirmation = () => (
@@ -760,7 +767,7 @@ export default function DashboardPenjual() {
     </div>
   );
 
-  const renderDashboard = () => {
+const renderDashboard = () => {
     const displayedMonths = getDisplayedMonths();
     
     return (
@@ -778,23 +785,6 @@ export default function DashboardPenjual() {
               <div className="rounded-full bg-[var(--color-sky-blue)] p-3">
                 <svg className="w-6 h-6 text-[var(--color-teal)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--color-teal)]">Total Terjual</p>
-                <p className="text-2xl font-semibold text-[var(--color-navy)]">{formatNumber(stats.totalSold)}</p>
-                <p className="text-xs text-[var(--color-teal)] mt-1">
-                  {formatCurrency(stats.totalRevenue)} revenue
-                </p>
-              </div>
-              <div className="rounded-full bg-green-100 p-3">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
             </div>
@@ -837,7 +827,7 @@ export default function DashboardPenjual() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6">
-            <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-4">Sebaran Jumlah Produk Berdasarkan Kategori</h3>
+            <h3 className="text-lg font-semibold text-[var(--color-navy)] mb-4">Sebaran Jumlah Stok Setiap Produk</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categories}>
@@ -990,12 +980,12 @@ export default function DashboardPenjual() {
               </thead>
               <tbody className="divide-y divide-[var(--color-sky-blue)]">
                 {[...products]
-                  .sort((a, b) => b.sold - a.sold)
+                  .sort((a, b) => (b.sold || 0) - (a.sold || 0))
                   .slice(0, 5)
                   .map((product) => (
                     <tr key={product.id} className="hover:bg-[var(--color-beige)]">
                       <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)] font-medium">
-                        {product.name}
+                        {product.name_id}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">
                         <span className="px-2 py-1 text-xs bg-[var(--color-sky-blue)] text-[var(--color-navy)] rounded-full">
@@ -1007,18 +997,18 @@ export default function DashboardPenjual() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">
-                          {product.sold} unit
+                          {product.sold || 0} unit
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)] font-bold">
-                        {formatCurrency(product.price * product.sold)}
+                        {formatCurrency(product.price * (product.sold || 0))}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
-                          <span className="text-[var(--color-navy)] font-medium">{product.rating}</span>
+                          <span className="text-[var(--color-navy)] font-medium">{product.rating?.toFixed(1) || 'N/A'}</span>
                         </div>
                       </td>
                     </tr>
@@ -1092,18 +1082,18 @@ export default function DashboardPenjual() {
           </thead>
           <tbody className="divide-y divide-[var(--color-sky-blue)]">
             {(() => {
-              let dataToShow = [];
+              let dataToShow: Product[] = [];
               switch (selectedReport) {
                 case 'stock-by-stock':
                   dataToShow = [...products].sort((a, b) => b.stock - a.stock);
                   break;
                 case 'stock-by-rating':
-                  dataToShow = [...products].sort((a, b) => b.rating - a.rating);
+                  dataToShow = [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0));
                   break;
                 case 'low-stock':
                   dataToShow = [...products]
                     .filter(product => product.stock < 2)
-                    .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+                    .sort((a, b) => a.category.localeCompare(b.category) || a.name_id.localeCompare(b.name_id));
                   break;
                 default:
                   dataToShow = products;
@@ -1114,15 +1104,21 @@ export default function DashboardPenjual() {
                   <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{index + 1}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden">
-                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-300 flex items-center justify-center text-blue-800 text-xs">
-                        <div className="text-center">
-                          <div className="text-lg">📷</div>
-                          <div className="text-[10px] mt-1">Image</div>
+                      {product.image_url ? (
+                        <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-300 flex items-center justify-center text-blue-800 text-xs">
+                          <div className="text-center">
+                            <div className="text-lg">📷</div>
+                            <div className="text-[10px] mt-1">Image</div>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+                          <span className="text-gray-500 text-xs">No Image</span>
+                        </div>
+                      )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.name_id}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{product.category}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">{formatCurrency(product.price)}</td>
                   {selectedReport === 'stock-by-stock' && (
@@ -1131,7 +1127,7 @@ export default function DashboardPenjual() {
                         <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                         </svg>
-                        <span className="text-[var(--color-navy)]">{product.rating}</span>
+                        <span className="text-[var(--color-navy)]">{product.rating?.toFixed(1) || 'N/A'}</span>
                       </div>
                     </td>
                   )}
@@ -1148,7 +1144,7 @@ export default function DashboardPenjual() {
                         <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                         </svg>
-                        <span className="text-[var(--color-navy)] font-medium">{product.rating}</span>
+                        <span className="text-[var(--color-navy)] font-medium">{product.rating?.toFixed(1) || 'N/A'}</span>
                       </div>
                     ) : (
                       <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
@@ -1211,14 +1207,15 @@ export default function DashboardPenjual() {
     </div>
   );
 
+  // Update renderKelolaProduk untuk menggunakan data dari database
   const renderKelolaProduk = () => (
     <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-[var(--color-navy)]">Kelola Produk</h2>
-          <p className="text-[var(--color-teal)]">Kelola produk yang Anda jual. Data akan tetap tersimpan meskipun logout.</p>
+          <p className="text-[var(--color-teal)]">Kelola produk yang Anda jual. Data akan tetap tersimpan di database.</p>
           <p className="text-sm text-[var(--color-teal)] mt-1">
-            Produk baru akan memiliki rating acak 3.0-5.0
+            Total {products.length} produk ditemukan
           </p>
         </div>
         
@@ -1243,6 +1240,7 @@ export default function DashboardPenjual() {
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Kategori</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Harga</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Stok</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Kondisi</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Terjual</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Rating</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--color-teal)] uppercase tracking-wider">Aksi</th>
@@ -1253,16 +1251,22 @@ export default function DashboardPenjual() {
               <tr key={product.id} className="hover:bg-[var(--color-beige)]">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden">
-                    <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-300 flex items-center justify-center text-blue-800">
-                      <div className="text-center">
-                        <div className="text-lg">📷</div>
-                        <div className="text-[10px] mt-1">Image</div>
+                    {product.image_url ? (
+                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-300 flex items-center justify-center text-blue-800">
+                        <div className="text-center">
+                          <div className="text-lg">📷</div>
+                          <div className="text-[10px] mt-1">Image</div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+                        <span className="text-gray-500">No Image</span>
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)] font-medium">
-                  {product.name}
+                  {product.name_id}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-[var(--color-navy)]">
                   <span className="px-2 py-1 text-xs bg-[var(--color-sky-blue)] text-[var(--color-navy)] rounded-full">
@@ -1284,8 +1288,17 @@ export default function DashboardPenjual() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    product.condition === 'Baru' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {product.condition}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   <span className="inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">
-                    {product.sold} unit
+                    {product.sold || 0} unit
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -1293,14 +1306,14 @@ export default function DashboardPenjual() {
                     <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
-                    <span className="text-[var(--color-navy)] font-medium">{product.rating}</span>
+                    <span className="text-[var(--color-navy)] font-medium">{product.rating?.toFixed(1) || 'N/A'}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap space-x-2">
                   <button
                     onClick={() => handleEditProduct(product)}
                     className="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    aria-label={`Edit produk ${product.name}`}
+                    aria-label={`Edit produk ${product.name_id}`}
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1310,7 +1323,7 @@ export default function DashboardPenjual() {
                   <button
                     onClick={() => handleDeleteProduct(product.id)}
                     className="inline-flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
-                    aria-label={`Hapus produk ${product.name}`}
+                    aria-label={`Hapus produk ${product.name_id}`}
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 011.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1334,13 +1347,13 @@ export default function DashboardPenjual() {
           <div className="bg-[var(--color-white)] p-4 rounded-lg shadow-sm">
             <p className="text-sm text-[var(--color-teal)]">Total Terjual</p>
             <p className="text-2xl font-bold text-[var(--color-navy)]">
-              {formatNumber(products.reduce((acc, product) => acc + product.sold, 0))} unit
+              {formatNumber(products.reduce((acc, product) => acc + (product.sold || 0), 0))} unit
             </p>
           </div>
           <div className="bg-[var(--color-white)] p-4 rounded-lg shadow-sm">
             <p className="text-sm text-[var(--color-teal)]">Rata-rata Rating</p>
             <p className="text-2xl font-bold text-[var(--color-navy)]">
-              {(products.reduce((acc, product) => acc + product.rating, 0) / products.length).toFixed(1)}/5
+              {(products.reduce((acc, product) => acc + (product.rating || 0), 0) / products.length).toFixed(1)}/5
             </p>
           </div>
           <div className="bg-[var(--color-white)] p-4 rounded-lg shadow-sm">
@@ -1354,6 +1367,7 @@ export default function DashboardPenjual() {
     </div>
   );
 
+  // Update renderTambahProduk untuk form tambah produk
   const renderTambahProduk = () => (
     <div className="bg-[var(--color-white)] rounded-lg shadow-sm border border-[var(--color-sky-blue)] p-6 max-w-2xl mx-auto">
       <h2 className="text-xl font-semibold text-[var(--color-navy)] mb-6">Tambah Produk Baru</h2>
@@ -1409,8 +1423,8 @@ export default function DashboardPenjual() {
             <input
               id="product-name"
               type="text"
-              value={newProduct.name}
-              onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+              value={newProduct.name_id}
+              onChange={(e) => setNewProduct({...newProduct, name_id: e.target.value})}
               className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
               placeholder="Masukkan nama produk"
               required
@@ -1467,6 +1481,35 @@ export default function DashboardPenjual() {
               placeholder="Masukkan jumlah stok"
               required
               min="0"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="product-condition" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
+              Kondisi
+            </label>
+            <select
+              id="product-condition"
+              value={newProduct.condition}
+              onChange={(e) => setNewProduct({...newProduct, condition: e.target.value})}
+              className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+            >
+              <option value="Baru">Baru</option>
+              <option value="Bekas">Bekas</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="product-description" className="block text-sm font-medium text-[var(--color-navy)] mb-2">
+              Deskripsi
+            </label>
+            <textarea
+              id="product-description"
+              value={newProduct.description}
+              onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+              className="w-full px-3 py-2 border border-[var(--color-sky-blue)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-teal)]"
+              placeholder="Masukkan deskripsi produk"
+              rows={3}
             />
           </div>
         </div>
@@ -1860,8 +1903,10 @@ export default function DashboardPenjual() {
               </div>
               <div className="flex items-center space-x-4">
                 <div className="text-right">
-                  <p className="text-sm text-[var(--color-navy)] font-medium">Penjual</p>
-                  <p className="text-xs text-[var(--color-teal)]">Toko Fashion XYZ</p>
+                  <p className="text-sm text-[var(--color-navy)] font-medium">
+                    {currentSeller ? currentSeller.store_name : 'Toko Tidak Ditemukan'}
+                    </p>
+                  <p className="text-xs text-[var(--color-teal)]">Penjual</p>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-[var(--color-sky-blue)] flex items-center justify-center">
                   <svg className="w-6 h-6 text-[var(--color-teal)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
