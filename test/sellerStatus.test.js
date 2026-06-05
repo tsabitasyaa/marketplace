@@ -1,16 +1,16 @@
-// // test/sellerStatus.test.js
+// test/sellerStatus.test.js
 
-// // Import fungsi yang akan diuji
-// const { calculateSellerStatusData } = require('../src/app/utils/sellerStatus');
+// Import fungsi yang akan diuji
+const { calculateSellerStatusData } = require('../src/app/utils/sellerStatus');
 
-// function testDUPLUNIT05() {
-//   const totalSellers = 120;
-//   const activeSellers = 70;
-//   const inactiveSellers = 50;
+function testDUPLUNIT05() {
+  const totalSellers = 120;
+  const activeSellers = 70;
+  const inactiveSellers = 50;
 
-//   const result = calculateSellerStatusData(activeSellers, inactiveSellers, totalSellers);
+  const result = calculateSellerStatusData(activeSellers, inactiveSellers, totalSellers);
 
-//   console.log(`   ${JSON.stringify(result, null, 2)}`);
-// }
+  console.log(`   ${JSON.stringify(result, null, 2)}`);
+}
 
-// testDUPLUNIT05();
+testDUPLUNIT05();
